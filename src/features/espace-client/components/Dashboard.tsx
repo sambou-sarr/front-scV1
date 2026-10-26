@@ -361,22 +361,6 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             className="db-side"
             aria-label={`Détail de ${displayName(cur)}`}
           >
-            <div className="db-card db-share">
-              <h2>Partager</h2>
-              {health(cur) === "draft" ? (
-                <p className="db-sub2">
-                  Publiez cette fiche depuis l’éditeur pour activer son lien
-                  public.
-                </p>
-              ) : (
-                <>
-                  <code>{url.replace("https://", "")}</code>
-                  <button className="db-copy" onClick={copy} aria-live="polite">
-                    {copied ? "Lien copié ✓" : "Copier le lien"}
-                  </button>
-                </>
-              )}
-            </div>
             <div className="db-card">
               <h2>Compléter « {displayName(cur)} »</h2>
               <p className="db-sub2">
