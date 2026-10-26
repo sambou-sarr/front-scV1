@@ -70,7 +70,6 @@ export interface ApiFicheSummary {
   enLigneSeule: boolean;
   scansTotal: number;
   userId: number | null;
-  claimCode: string | null;
   secteur: ApiSecteur | null;
   presentation: string | null;
   rdvLabel: string | null;

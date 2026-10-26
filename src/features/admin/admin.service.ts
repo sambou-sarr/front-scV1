@@ -121,19 +121,16 @@ export const adminApi = {
   listFiches: (p: ListFichesParams) =>
     get<FichesPage>("/admin/fiches", { ...p }),
   getFiche: (id: number) => get<FicheDetail>(`/admin/fiches/${id}`),
-  // statut / slug / propriétaire (userId: null = retirer le propriétaire)
+  // statut / slug (avant création du compte client)
   updateFiche: (
     id: number,
     b: {
       slug?: string;
       statut?: "active" | "suspendue";
-      userId?: number | null;
     },
   ) => patch<{ fiche: unknown }>(`/admin/fiches/${id}`, b),
   deleteFiche: (id: number, slug: string) =>
     del<{ ok: true }>(`/admin/fiches/${id}`, { confirmer: slug }),
-  generateClaimCode: (id: number) =>
-    post<{ claimCode: string }>(`/admin/fiches/${id}/claim-code`),
 
   // ───── Abonnements ─────
   activateSubscription: (id: number, b: SubscriptionInput) =>

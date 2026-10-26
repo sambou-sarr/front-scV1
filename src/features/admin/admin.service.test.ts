@@ -80,10 +80,10 @@ describe("adminApi", () => {
     ]);
   });
 
-  it("transmet le corps des PATCH (propriétaire retiré = userId null)", async () => {
-    await adminApi.updateFiche(5, { userId: null });
+  it("transmet les changements de slug d'une fiche sans compte client", async () => {
+    await adminApi.updateFiche(5, { slug: "nouvelle-adresse" });
     expect(calls[0]).toMatchObject({ method: "patch", url: "/admin/fiches/5" });
-    expect(JSON.parse(String(calls[0].data))).toEqual({ userId: null });
+    expect(JSON.parse(String(calls[0].data))).toEqual({ slug: "nouvelle-adresse" });
   });
 
   it("remonte les erreurs en ApiError lisible (format serveur, texte simple, repli par statut)", async () => {

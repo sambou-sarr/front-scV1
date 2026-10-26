@@ -26,7 +26,6 @@ export default function Dashboard() {
       <section className="kpis">
         <Kpi icon="clock" label="Expirent sous 30 jours" value={f.expirentBientot} sub="renouvellement à relancer" tone={f.expirentBientot ? 'warn' : undefined} onClick={go('/relances')} />
         <Kpi icon="x" label="Expirées" value={f.expirees} sub="aucun abonnement valable" tone={f.expirees ? 'down' : undefined} onClick={go('/fiches?expiration=expiree')} />
-        <Kpi icon="card" label="Cartes à lier" value={f.cartesALier} sub="code pas encore saisi par le client" onClick={go('/fiches?carteALier=true')} />
         <Kpi icon="shield" label="Suspendues" value={f.suspendues} sub="page masquée" onClick={go('/fiches?statut=suspendue')} />
       </section>
 

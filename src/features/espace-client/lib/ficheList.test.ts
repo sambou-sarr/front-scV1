@@ -29,7 +29,6 @@ const fiche = (
   enLigneSeule: true,
   scansTotal: 0,
   userId: 1,
-  claimCode: null,
   secteur: "BEAUTE",
   presentation: null,
   rdvLabel: null,

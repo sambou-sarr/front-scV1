@@ -22,10 +22,10 @@ import Relances from "./pages/Relances";
 const fiche = (id: number, slug: string, entreprise: string) => ({
   id, slug, nom: "Awa Ndiaye", entreprise, statut: "active", formule: "pro", expiree: false,
   dateEcheance: "2027-01-15T00:00:00Z", scansTotal: 42, createdAt: "2026-01-01T00:00:00Z",
-  proprietaire: { id: 9, email: "awa@sc.sn", nom: "Awa" }, carteALier: false,
+  proprietaire: { id: 9, email: "awa@sc.sn", nom: "Awa" },
 });
 const stats = {
-  fiches: { total: 7, suspendues: 2, expirees: 1, expirentBientot: 3, sansProprietaire: 1, cartesALier: 4, nouvellesSur30Jours: 5 },
+  fiches: { total: 7, suspendues: 2, expirees: 1, expirentBientot: 3, sansProprietaire: 1, nouvellesSur30Jours: 5 },
   formules: { essentielle: 1, pro: 4, signature: 2 }, scansTotal: 1234, clients: 6,
 };
 const revenus = {
@@ -45,8 +45,11 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
   if (url === "/admin/revenus") return revenus;
   if (url === "/admin/fiches") return { fiches: [fiche(12, "chez-awa", "Chez Awa")], pagination: page };
   if (url === "/admin/fiches/12")
-    return { fiche: { id: 12, slug: "chez-awa", nom: "Awa Ndiaye", entreprise: "Chez Awa", statut: "active" },
-      proprietaire: { id: 9, email: "awa@sc.sn", nom: "Awa" }, claimCode: null, abonnements: [] };
+    return { fiche: { id: 12, slug: "chez-awa", nom: "Awa Ndiaye", entreprise: "Chez Awa", statut: "active", compteClientCree: true },
+      abonnements: [] };
+  if (url === "/admin/fiches/13")
+    return { fiche: { id: 13, slug: "fiche-libre", nom: "Fiche libre", statut: "active" },
+      abonnements: [] };
   if (url === "/admin/users")
     return { users: [{ id: 9, email: "awa@sc.sn", nom: "Awa", role: "client", emailVerifie: true, createdAt: "2026-01-01T00:00:00Z", nbFiches: 2 }], pagination: page };
   if (url === "/admin/relances") return { total: 0, items: [] };
@@ -138,6 +141,23 @@ describe("pages du back-office", () => {
     expect(where()).toBe("/admin/fiches/12");
     expect(host.textContent).toContain("Abonnements");
     expect(calls.some(c => c.url === "/admin/fiches/12")).toBe(true);
+  });
+
+  it("le détail ne permet plus de changer le propriétaire ni de gérer des codes carte", async () => {
+    act(() => root.render(app("/admin/fiches/12")));
+    await settle();
+    expect(host.textContent).not.toContain("Accès client");
+    expect(host.textContent).not.toContain("Propriétaire & carte");
+    expect(host.textContent).not.toContain("Modifier l’adresse");
+    expect(host.textContent).not.toContain("Code de la carte");
+    expect(host.textContent).not.toContain("Propriétaire");
+    expect(host.textContent).not.toContain("Retirer");
+  });
+
+  it("un slug reste modifiable avant la création du compte client", async () => {
+    act(() => root.render(app("/admin/fiches/13")));
+    await settle();
+    expect(host.textContent).toContain("Modifier l’adresse");
   });
 
   it("un client ouvre la liste de ses fiches (?userId=)", async () => {
