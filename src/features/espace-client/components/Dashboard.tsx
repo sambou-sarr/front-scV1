@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { isAuthFailure } from "../../../lib/apiError";
 import { clearSession } from "../../../lib/session";
 import "../../../styles/dashboard.css";
@@ -190,15 +191,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
     (a, f) => (f.updatedAt > a ? f.updatedAt : a),
     fiches[0].updatedAt
   );
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      /* presse-papiers refusé : le lien reste affiché */
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+
 
   return (
     <div className="db">
@@ -219,11 +212,15 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
         <ul className="db-alerts" role="status">
           {alerts.map(f => (
             <li key={f.id} className={PILL[health(f)].cls}>
-              <b>{displayName(f)}</b> —{" "}
+              <b>{displayName(f)}</b> —{" "} 
               {PILL[health(f)].text(daysLeft(subscriptionEndsAt(f)))}.{" "}
-              <a href="#renouveler">Renouveler</a>
+              <Link to="abonnement">Voir</Link>
             </li>
           ))}
+
+          {alerts.length >  0 && (
+            <p> {alerts.length} en   </p>
+          )}
         </ul>
       )}
 

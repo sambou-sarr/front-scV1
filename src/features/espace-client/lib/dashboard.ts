@@ -2,8 +2,7 @@
 import { ENV } from "../../../lib/env";
 import type { ApiFicheSummary, ApiSecteur } from "../../../types";
 
-export const publicUrl = (slug: string) =>
-  `${ENV.VITE_BASE_URL}/f/${slug}`;
+export const publicUrl = (slug: string) => `${ENV.VITE_BASE_URL}/f/${slug}`;
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("fr-FR", {
     day: "numeric",
@@ -27,7 +26,7 @@ export const daysLeft = (
   iso: string | null | undefined,
   now = Date.now()
 ): number | null =>
-  iso ? Math.ceil((new Date(iso).getTime() - now) / 86_400_000) : null
+  iso ? Math.ceil((new Date(iso).getTime() - now) / 86_400_000) : null;
 
 export const subscriptionEndsAt = (f: ApiFicheSummary) =>
   f.subscriptions?.[0]?.endsAt ??
@@ -41,7 +40,8 @@ export function health(f: ApiFicheSummary, now = Date.now()): Health {
   if (f.statut !== "ACTIVE") return "suspended";
   const subscription =
     f.subscriptions?.[0] ?? f.latestSubscription ?? f.abonnementActif;
-  if (subscription?.status && subscription.status !== "ACTIVE") return "expired";
+  if (subscription?.status && subscription.status !== "ACTIVE")
+    return "expired";
   const d = daysLeft(subscriptionEndsAt(f), now);
   return d === null ? "ok" : d < 0 ? "expired" : d <= 30 ? "soon" : "ok";
 }
