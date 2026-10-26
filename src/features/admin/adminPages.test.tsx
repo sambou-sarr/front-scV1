@@ -115,8 +115,9 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Root");
     expect(host.textContent).toContain("Encaissé ce mois");
     expect(host.textContent).toMatch(/50\s000\sF/); // espace (insécable) du format fr-FR
-    for (const l of ["Fiches", "Clients", "Relances", "Production", "QR codes", "Paramètres"])
+    for (const l of ["Fiches", "Clients", "Relances", "Production", "QR codes", "Formules"])
       expect(byText("aside nav a", l), l).toBeTruthy();
+    expect(byText("aside nav a", "Formules")?.getAttribute("href")).toBe("/admin/formules");
   });
 
   it("un indicateur du tableau de bord ouvre la liste de fiches filtrée", async () => {

@@ -41,8 +41,8 @@ const validPacks = (unit: number | null) => (l: Pack[]) => {
   return null;
 };
 
-export default function Parametres() {
-  const [data, reload, err] = useData(() => adminApi.getParametres());
+export default function Formules() {
+  const [data, reload, err] = useData(() => adminApi.getFormules());
   const [rows, setRows] = useState<FormuleReglage[]>([]);
   const [emp, setEmp] = useState<Emplacements>({ prixUnitaireFcfa: null, packs: [] });
   const run = useAction();
@@ -65,7 +65,7 @@ export default function Parametres() {
 
   return (
     <>
-      <header className="ph"><p className="eyebrow">Réglages</p><h1>Paramètres</h1>
+      <header className="ph"><p className="eyebrow">Réglages des formules</p><h1>Formules</h1>
         <p className="lede">Prix, remises et emplacements. Le prix d'un abonnement = prix mensuel × durée, moins la remise de durée, puis moins la remise de quantité (les deux se cumulent). Les abonnements déjà créés ne changent pas.</p></header>
 
       {/* ───── Formules : prix mensuel + valeurs par défaut ───── */}

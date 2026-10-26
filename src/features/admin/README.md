@@ -5,14 +5,14 @@ Interface d'administration, accessible sous `/admin`. Elle réutilise le socle d
 ## Organisation
 - `admin.service.ts` : tous les appels `/admin/*` et `/client/qrcodes/*` (`adminApi`), erreurs en `ApiError` lisible.
 - `layout/AdminLayout.tsx` : menu, tiroir mobile, `<Outlet />`. Protégé par `features/auth/RequireAdmin.tsx`.
-- `pages/` : AdminLoginPage, Dashboard, Fiches, FicheDetail, Clients, Relances, Production, QrCodes, Parametres, AdminNotFound.
+- `pages/` : AdminLoginPage, Dashboard, Fiches, FicheDetail, Clients, Relances, Production, QrCodes, Formules, AdminNotFound.
 - `components/` : `ui.tsx` (Btn, Modal, Toast, Icon…), FichePicker, UserPicker, ProductionModals.
 - `hooks/useData.ts` : chargement de données (`useData`, `useDebounced`).
 - `lib/` : format, print (planches/cartes), production, whatsapp.
 - Types : `src/types/admin.ts` (volontairement hors de `types/index.ts`, des noms comme `Formule` y existent déjà).
 
 ## Routes
-`/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/qrcodes`, `/admin/parametres`.
+`/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/qrcodes`, `/admin/formules`.
 Les filtres de la liste de fiches se lisent dans l'URL : `?statut=…`, `?userId=…`.
 
 ## Session

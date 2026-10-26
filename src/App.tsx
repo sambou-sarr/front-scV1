@@ -59,7 +59,7 @@ const AdminClients = lazy(() => import("./features/admin/pages/Clients"));
 const AdminRelances = lazy(() => import("./features/admin/pages/Relances"));
 const AdminProduction = lazy(() => import("./features/admin/pages/Production"));
 const AdminQrCodes = lazy(() => import("./features/admin/pages/QrCodes"));
-const AdminParametres = lazy(() => import("./features/admin/pages/Parametres"));
+const AdminFormules = lazy(() => import("./features/admin/pages/Formules"));
 const AdminNotFound = lazy(() => import("./features/admin/pages/AdminNotFound"));
 
 const SECTOR_IDS: string[] = SECTORS.map(x => x.id);
@@ -194,7 +194,7 @@ export default function App() {
             <Route path="relances" element={<AdminRelances />} />
             <Route path="production" element={<AdminProduction />} />
             <Route path="qrcodes" element={<AdminQrCodes />} />
-            <Route path="parametres" element={<AdminParametres />} />
+            <Route path="formules" element={<AdminFormules />} />
             <Route path="*" element={<AdminNotFound />} />
           </Route>
 

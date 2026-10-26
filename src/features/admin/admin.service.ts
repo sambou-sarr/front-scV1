@@ -143,17 +143,17 @@ export const adminApi = {
       `/admin/fiches/${id}/subscriptions/${subId}/cancel`,
     ),
 
-  // ───── Paramètres (prix, remises, emplacements) ─────
-  getParametres: () => get<Parametres>("/admin/parametres"),
+  // ───── Formules (prix, remises, emplacements) ─────
+  getFormules: () => get<Parametres>("/admin/formules"),
   updateFormule: (formule: string, b: PatchFormule) =>
     patch<{ formule: FormuleReglage }>(
-      `/admin/parametres/formules/${formule}`,
+      `/admin/formules/${formule}`,
       b,
     ),
   updateEmplacements: (b: PatchEmplacements) =>
-    patch<{ emplacements: Emplacements }>("/admin/parametres/emplacements", b),
+    patch<{ emplacements: Emplacements }>("/admin/formules/emplacements", b),
   tarifCommande: (b: CommandeInput) =>
-    post<TarifCommande>("/admin/parametres/commande/tarif", b),
+    post<TarifCommande>("/admin/formules/commande/tarif", b),
 
   // ───── Relances (renouvellements, expirées, montée en gamme) ─────
   getRelances: (

@@ -66,6 +66,20 @@ describe("adminApi", () => {
     });
   });
 
+  it("utilise les routes Formules pour les réglages administrateur", async () => {
+    await adminApi.getFormules();
+    await adminApi.updateFormule("pro", { actif: true });
+    await adminApi.updateEmplacements({ prixUnitaireFcfa: 1500 });
+    await adminApi.tarifCommande({ lignes: [], emplacements: 2 });
+
+    expect(calls.map(({ method, url }) => [method, url])).toEqual([
+      ["get", "/admin/formules"],
+      ["patch", "/admin/formules/pro"],
+      ["patch", "/admin/formules/emplacements"],
+      ["post", "/admin/formules/commande/tarif"],
+    ]);
+  });
+
   it("transmet le corps des PATCH (propriétaire retiré = userId null)", async () => {
     await adminApi.updateFiche(5, { userId: null });
     expect(calls[0]).toMatchObject({ method: "patch", url: "/admin/fiches/5" });
