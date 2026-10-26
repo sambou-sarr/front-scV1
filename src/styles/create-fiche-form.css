@@ -1,0 +1,318 @@
+/* Aligné sur l'éditeur existant : Inter, noir #08090A, bordures #e3dfd8, focus rouge #EF1733. */
+.cf {
+  --ink: #08090a;
+  --mut: #6f6a62;
+  --line: #e3dfd8;
+  --acc: #ef1733;
+  --err: #b3261e;
+  max-width: 520px;
+  margin: 0 auto;
+  font:
+    15px/1.5 Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: var(--ink);
+}
+.cf *,
+.cf *::before,
+.cf *::after {
+  box-sizing: border-box;
+}
+
+.cf-plan {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #08090a;
+  color: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 14px 18px;
+}
+.cf-plan small {
+  display: block;
+  color: #9a968f;
+  font-size: 12px;
+}
+.cf-plan b {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.cf-plan span {
+  font-size: 12.5px;
+  font-weight: 700;
+  border: 1px solid #3a3a3d;
+  border-radius: 20px;
+  padding: 4px 11px;
+}
+
+.cf-box {
+  background: #fff;
+  border-radius: 0 0 16px 16px;
+  padding: 22px 18px 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+}
+.cf-box h2 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.cf-sub {
+  margin: 0 0 20px;
+  color: var(--mut);
+}
+
+.cf-grid {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 480px) {
+  .cf-two {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cf-field label {
+  display: block;
+  font-weight: 600;
+  font-size: 13.5px;
+  margin: 0 0 6px;
+}
+.cf-field .cf-opt {
+  font-weight: 400;
+  color: var(--mut);
+}
+
+.cf-input {
+  display: block;
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+} /* 16px : évite le zoom automatique sur iPhone */
+.cf-input::placeholder {
+  color: #a8a39b;
+}
+.cf-input:focus {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px rgba(239, 23, 51, 0.12);
+}
+.cf-input:disabled {
+  background: #f6f4f0;
+  color: var(--mut);
+}
+.cf-input[aria-invalid="true"] {
+  border-color: var(--err);
+  box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.12);
+}
+
+.cf-err {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--err);
+}
+
+.cf-field label.cf-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 10px 0 0;
+  font-weight: 400;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cf-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--acc);
+}
+
+.cf-alert {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border: 1px solid #f1c5c2;
+  border-radius: 10px;
+  background: #fdf1f0;
+  color: var(--err);
+  font-size: 14px;
+}
+
+.cf-btn {
+  display: block;
+  width: 100%;
+  height: 50px;
+  margin-top: 22px;
+  border: 0;
+  border-radius: 12px;
+  background: #08090a;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+.cf-btn:hover:not(:disabled) {
+  background: #1f2023;
+}
+.cf-btn:focus-visible {
+  outline: 3px solid var(--acc);
+  outline-offset: 2px;
+}
+.cf-btn:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cf-btn {
+    transition: background 0.15s;
+  }
+}
+
+.cf-note {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--mut);
+  max-width: 60ch;
+}
+.cf-total {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+}
+.cf-btn.cf-secondary {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+.cf-btn.cf-secondary:hover:not(:disabled) {
+  background: #f6f4f0;
+}
+.cf-link {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+/* Formulaire intégré dans une fenêtre : garder une grille lisible sur petit écran. */
+.cf-grid.cf-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cf-field {
+  min-width: 0;
+}
+.cf-input {
+  min-width: 0;
+}
+.cf-link:hover {
+  text-decoration: underline;
+}
+@media (max-width: 479px) {
+  .cf-grid.cf-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Grille compacte et uniforme pour le formulaire de creation */
+.cf-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 12px;
+  align-items: start;
+}
+.cf-form-grid > .cf-field {
+  min-width: 0;
+  width: 100%;
+}
+.cf-form-grid > .cf-field-full {
+  grid-column: 1/-1;
+}
+.cf-form-grid .cf-input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+}
+.cf-box {
+  padding: 16px 18px 14px;
+}
+.cf-box h2 {
+  font-size: 20px;
+  margin-bottom: 3px;
+}
+.cf-sub {
+  font-size: 13px;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+.cf-field label {
+  font-size: 12.5px;
+  margin-bottom: 5px;
+  line-height: 1.35;
+}
+.cf-field label.cf-check {
+  margin-top: 7px;
+  font-size: 12.5px;
+}
+.cf-btn {
+  height: 44px;
+  margin-top: 14px;
+}
+.cf-note {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 9px;
+}
+.cf-alert {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+}
+@media (max-width: 640px) {
+  .cf-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 11px;
+  }
+  .cf-form-grid > .cf-field-full {
+    grid-column: auto;
+  }
+  .cf-box {
+    padding: 14px 14px 12px;
+  }
+  .cf-plan {
+    padding: 11px 14px;
+  }
+  .cf-plan b {
+    font-size: 18px;
+  }
+  .cf-sub {
+    margin-bottom: 12px;
+  }
+}
+@media (max-width: 360px) {
+  .cf-plan {
+    gap: 8px;
+  }
+  .cf-plan b {
+    font-size: 17px;
+  }
+  .cf-plan span {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  .cf-input {
+    font-size: 16px;
+  }
+}

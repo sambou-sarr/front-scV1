@@ -1,0 +1,312 @@
+diff --git a/.env.example b/.env.example
+index f40cb33..d1e9d35 100644
+--- a/.env.example
++++ b/.env.example
+@@ -36,4 +36,5 @@ SERVER=http://localhost:4000/api
+ 
+ # FFmpeg doit être installé sur le serveur pour optimiser images et vidéos
+ FFMPEG_PATH=ffmpeg
+-# fdsfdsfsd
+\ No newline at end of file
++# fdsfdsfsd# FFprobe (livré avec FFmpeg) : vérifie la durée des vidéos de menu. Par défaut : déduit de FFMPEG_PATH.
++# FFPROBE_PATH=ffprobe
+diff --git a/docs/media-storage.md b/docs/media-storage.md
+index 3801838..1366df8 100644
+--- a/docs/media-storage.md
++++ b/docs/media-storage.md
+@@ -23,6 +23,7 @@ Variables de configuration utilisées :
+ - `S3_REGION` : région attendue par le service S3.
+ - `S3_BUCKET` : bucket utilisé.
+ - `FFMPEG_PATH` : chemin du binaire FFmpeg, par défaut `ffmpeg`.
++- `FFPROBE_PATH` : chemin de FFprobe (livré avec FFmpeg), par défaut déduit de `FFMPEG_PATH`. Sert à vérifier la durée des vidéos de menu.
+ 
+ ## Dépendance d'optimisation
+ 
+@@ -41,3 +42,17 @@ La lecture des vidéos prend en charge les requêtes HTTP `Range` afin de permet
+ ## Tests
+ 
+ Les tests unitaires de `media.validation.ts` couvrent les formats MIME, les signatures, les limites de taille et l'extraction des références. Exécuter `npm test`, puis `npm run typecheck` et `npm run build` dans l'environnement backend. Le pipeline réel doit aussi être testé avec SeaweedFS et FFmpeg installés.
++
++## Vidéos de menu (`?purpose=menu`)
++
++`POST /api/fiches/:id/media?purpose=menu` : le serveur lit la durée avec FFprobe et refuse (422 `VIDEO_TROP_LONGUE`) toute
++vidéo qui dépasse `plan_limits.maxMenuVideoSeconds` (tolérance 0,5 s). Formule sans menu ou sans vidéo par plat : 403
++`FORMULE_SANS_VIDEO_MENU`. Sans `purpose`, aucune limite de durée (vidéos de galerie).
++
++Les images ne sont plus bloquées par `maxPhotos` : elles servent aussi à la photo de profil, au logo et à la couverture.
++Le quota de la galerie est contrôlé à l'enregistrement de la fiche (`PATCH /api/fiches/:id`).
++
++## Contrôle de version (`PATCH /api/fiches/:id`)
++
++La fiche expose `updatedAt`. Le client peut renvoyer `baseUpdatedAt` (la valeur qu'il a lue) : si la fiche a changé entre-temps,
++le serveur répond 409 `CONFLIT_VERSION` sans rien écrire. Le champ est facultatif (absent = pas de contrôle).
+diff --git a/src/modules/fiches/fiches.dto.ts b/src/modules/fiches/fiches.dto.ts
+index 14df218..f1cc273 100644
+--- a/src/modules/fiches/fiches.dto.ts
++++ b/src/modules/fiches/fiches.dto.ts
+@@ -55,6 +55,8 @@ export function toFicheDto(f: FicheFull, sub: EffectiveSubscription | null) {
+     googlePlaceId: s(f.googlePlaceId),
+     dateEcheance: sub?.endsAt ? sub.endsAt.toISOString().slice(0, 10) : null,
+     scansTotal: f.scansTotal,
++    // Version de la fiche : renvoyée par l'éditeur (baseUpdatedAt) pour détecter une modification concurrente.
++    updatedAt: f.updatedAt.toISOString(),
+     data: {
+       secteur: f.secteur ? lower(f.secteur) : undefined,
+       premierBouton: lower(f.premierBouton),
+diff --git a/src/modules/fiches/fiches.routes.ts b/src/modules/fiches/fiches.routes.ts
+index b6a0208..ed919ac 100644
+--- a/src/modules/fiches/fiches.routes.ts
++++ b/src/modules/fiches/fiches.routes.ts
+@@ -2,6 +2,7 @@ import { Router, raw } from "express";
+ import { optionalAuth, requireAuth } from "../../middlewares/auth";
+ import { validate } from "../../middlewares/validate";
+ import { MediaController } from "../media/media.controller";
++import { mediaUploadQuery } from "../media/media.validation";
+ import { FicheController } from "./fiche.controller";
+ import {
+   createFicheSchema,
+@@ -58,7 +59,7 @@ fichesRouter.post(
+ // L'upload utilise le corps binaire du fichier, pas du JSON/base64.
+ fichesRouter.post(
+   "/:id/media",
+-  validate({ params: idParam }),
++  validate({ params: idParam, query: mediaUploadQuery }),
+   raw({ type: () => true, limit: "30mb" }),
+   MediaController.upload
+ );
+diff --git a/src/modules/fiches/fiches.schemas.ts b/src/modules/fiches/fiches.schemas.ts
+index a4f758e..c57b6d2 100644
+--- a/src/modules/fiches/fiches.schemas.ts
++++ b/src/modules/fiches/fiches.schemas.ts
+@@ -116,6 +116,8 @@ export const updateFicheSchema = z
+     adresse: text(250),
+     googlePlaceId: text(200),
+     data: dataSchema,
++    // Version vue par le client au chargement (champ `updatedAt` de la fiche). Facultatif : absent = pas de contrôle.
++    baseUpdatedAt: z.string().datetime(),
+   })
+   .partial();
+ 
+diff --git a/src/modules/fiches/fiches.service.ts b/src/modules/fiches/fiches.service.ts
+index 48acda2..1558e44 100644
+--- a/src/modules/fiches/fiches.service.ts
++++ b/src/modules/fiches/fiches.service.ts
+@@ -10,7 +10,7 @@ import type {
+   Theme,
+ } from "../../database/prisma/generated/prisma/client";
+ import { prisma } from "../../database/prisma/prisma-client";
+-import { HttpError, forbidden, notFound } from "../../lib/httpError";
++import { HttpError, conflict, forbidden, notFound } from "../../lib/httpError";
+ import { logger } from "../../lib/logger";
+ import {
+   getEffectiveSubscription,
+@@ -212,6 +212,7 @@ export const FicheService = {
+     const input = enforcePlanLimits(sub.plan.limits, normalizeMediaReferences(rawInput)); // 422 si dépassement
+     const previousSnapshot = await loadFull(id);
+     const d = input.data;
++    const baseVersion = rawInput.baseUpdatedAt ? new Date(rawInput.baseUpdatedAt) : null;
+ 
+     await prisma.$transaction(
+       async tx => {
+@@ -245,7 +246,17 @@ export const FicheService = {
+           enteteTheme: d?.entete?.theme ? up<Theme>(d.entete.theme) : undefined,
+           enteteCouverture: nullIfEmpty(d?.entete?.couverture),
+         };
+-        await tx.fiche.update({ where: { id }, data: scalar });
++        // Écriture conditionnelle : si la fiche a changé depuis le chargement de l'éditeur (autre onglet, autre
++        // appareil, admin), on n'écrase pas. Le test et l'écriture sont dans la même requête SQL : pas de course.
++        const written = await tx.fiche.updateMany({
++          where: { id, ...(baseVersion ? { updatedAt: baseVersion } : {}) },
++          data: { ...scalar, updatedAt: new Date() },
++        });
++        if (written.count === 0)
++          throw conflict(
++            "CONFLIT_VERSION",
++            "Cette fiche a été modifiée ailleurs depuis son ouverture. Rechargez-la pour voir la dernière version."
++          );
+ 
+         // Règle : une liste fournie REMPLACE l'existante ; une liste absente n'est pas touchée.
+         if (d?.reseauxSociaux) {
+diff --git a/src/modules/media/media.controller.ts b/src/modules/media/media.controller.ts
+index 61327ae..2693fce 100644
+--- a/src/modules/media/media.controller.ts
++++ b/src/modules/media/media.controller.ts
+@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
+ import { asyncHandler } from "../../lib/asyncHandler";
+ import { HttpError } from "../../lib/httpError";
+ import { MediaService } from "./media.service";
++import type { MediaPurpose } from "./media.validation";
+ 
+ export const MediaController = {
+   upload: asyncHandler(async (req: Request, res: Response) => {
+@@ -13,7 +14,8 @@ export const MediaController = {
+       req.user!,
+       Number(req.params.id),
+       req.body,
+-      Array.isArray(contentType) ? contentType[0] : contentType
++      Array.isArray(contentType) ? contentType[0] : contentType,
++      req.query.purpose as MediaPurpose
+     );
+     res.status(201).json({ media });
+   }),
+diff --git a/src/modules/media/media.processor.ts b/src/modules/media/media.processor.ts
+index 5e6d6e7..a67f903 100644
+--- a/src/modules/media/media.processor.ts
++++ b/src/modules/media/media.processor.ts
+@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { HttpError } from "../../lib/httpError";
+-import type { SupportedMediaMime } from "./media.validation";
++import { parseProbeDuration, type SupportedMediaMime } from "./media.validation";
+ 
+ export interface ProcessedMedia { body: Buffer; mime: SupportedMediaMime; }
+ 
+@@ -42,3 +42,30 @@ export async function optimizeMedia(body: Buffer, mime: SupportedMediaMime, ffmp
+     return optimized.length < body.length ? { body: optimized, mime: outputMime } : { body, mime };
+   } finally { await rm(directory, { recursive: true, force: true }); }
+ }
++
++const probePathFor = (ffmpegPath: string) =>
++  process.env.FFPROBE_PATH || (/ffmpeg$/.test(ffmpegPath) ? ffmpegPath.replace(/ffmpeg$/, "ffprobe") : "ffprobe");
++
++/** Durée d'une vidéo en secondes (ffprobe, sans shell) ; `null` si elle est illisible. */
++export async function probeDurationSeconds(body: Buffer, mime: SupportedMediaMime, ffmpegPath = process.env.FFMPEG_PATH || "ffmpeg"): Promise<number | null> {
++  const directory = await mkdtemp(join(tmpdir(), "support-connecte-probe-"));
++  const inputPath = join(directory, mime === "video/webm" ? "input.webm" : "input.mp4");
++  try {
++    await writeFile(inputPath, body);
++    const stdout = await new Promise<string>((resolve, reject) => {
++      const child = spawn(probePathFor(ffmpegPath), ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", inputPath], { stdio: ["ignore", "pipe", "ignore"] });
++      let out = "";
++      child.stdout.setEncoding("utf8");
++      child.stdout.on("data", chunk => { out = (out + chunk).slice(0, 200); });
++      child.once("error", error => {
++        if ("code" in error && error.code === "ENOENT") {
++          reject(new HttpError(503, "MEDIA_PROCESSOR_UNAVAILABLE", "Le serveur doit disposer de FFprobe (livré avec FFmpeg) pour vérifier les vidéos"));
++          return;
++        }
++        reject(error);
++      });
++      child.once("close", code => code === 0 ? resolve(out) : resolve(""));
++    });
++    return parseProbeDuration(stdout);
++  } finally { await rm(directory, { recursive: true, force: true }); }
++}
+diff --git a/src/modules/media/media.service.ts b/src/modules/media/media.service.ts
+index 0aaec48..8f5af4d 100644
+--- a/src/modules/media/media.service.ts
++++ b/src/modules/media/media.service.ts
+@@ -5,10 +5,12 @@ import { forbidden, notFound, unprocessable } from "../../lib/httpError";
+ import type { AuthUser } from "../../types/user";
+ import { getEffectiveSubscription } from "../subscriptions/subscriptions.service";
+ import { S3StorageProvider } from "../../infrastructure/storage/s3.storage";
+-import { optimizeMedia } from "./media.processor";
++import { optimizeMedia, probeDurationSeconds } from "./media.processor";
+ import {
+   MEDIA_FORMATS,
++  assertMenuVideoDuration,
+   mediaMaxBytes,
++  type MediaPurpose,
+   resolveMediaMime,
+   validateMediaSignature,
+ } from "./media.validation";
+@@ -28,7 +30,7 @@ function publicUrl(ficheId: number, fileName: string) {
+ }
+ 
+ export const MediaService = {
+-  async upload(user: AuthUser, ficheId: number, body: Buffer, rawMime?: string) {
++  async upload(user: AuthUser, ficheId: number, body: Buffer, rawMime?: string, purpose?: MediaPurpose) {
+     if (!Buffer.isBuffer(body) || body.length === 0) {
+       throw unprocessable("FICHIER_VIDE", "Le fichier envoyé est vide");
+     }
+@@ -66,6 +68,13 @@ export const MediaService = {
+     }
+ 
+     validateMediaSignature(body, mime);
++    if (kind === "video" && purpose === "menu") {
++      if (!limits.hasMenu || !limits.menuVideoPerItem) {
++        throw forbidden("FORMULE_SANS_VIDEO_MENU", "Les vidéos de menu ne sont pas disponibles avec cette formule");
++      }
++      // Même règle que l'éditeur (30 s), mais appliquée ici : le navigateur n'est pas une garantie.
++      assertMenuVideoDuration(await probeDurationSeconds(body, mime), limits.maxMenuVideoSeconds);
++    }
+     const optimized = await optimizeMedia(body, mime);
+     const finalMime = optimized.mime;
+     const finalFormat = MEDIA_FORMATS[finalMime];
+diff --git a/src/modules/media/media.validation.test.ts b/src/modules/media/media.validation.test.ts
+index f134d41..259e614 100644
+--- a/src/modules/media/media.validation.test.ts
++++ b/src/modules/media/media.validation.test.ts
+@@ -1,6 +1,9 @@
+ import { describe, expect, it } from "vitest";
+ import { collectStoredMediaKeys } from "./media.validation";
+ import {
++  assertMenuVideoDuration,
++  mediaUploadQuery,
++  parseProbeDuration,
+   mediaMaxBytes,
+   resolveMediaMime,
+   validateMediaSignature,
+@@ -48,3 +51,27 @@ describe("stored media references", () => {
+     ]);
+   });
+ });
++
++describe("durée des vidéos de menu", () => {
++  it("lit la durée renvoyée par ffprobe", () => {
++    expect(parseProbeDuration("12.480000\n")).toBeCloseTo(12.48);
++    expect(parseProbeDuration("")).toBeNull();
++    expect(parseProbeDuration("N/A")).toBeNull();
++  });
++
++  it("accepte jusqu'au maximum plus 0,5 s de tolérance", () => {
++    expect(() => assertMenuVideoDuration(30, 30)).not.toThrow();
++    expect(() => assertMenuVideoDuration(30.4, 30)).not.toThrow();
++  });
++
++  it("refuse une vidéo trop longue ou de durée inconnue", () => {
++    expect(() => assertMenuVideoDuration(30.6, 30)).toThrow(/30 secondes/);
++    expect(() => assertMenuVideoDuration(null, 30)).toThrow();
++  });
++
++  it("n'accepte que le motif « menu »", () => {
++    expect(mediaUploadQuery.safeParse({ purpose: "menu" }).success).toBe(true);
++    expect(mediaUploadQuery.safeParse({}).success).toBe(true);
++    expect(mediaUploadQuery.safeParse({ purpose: "autre" }).success).toBe(false);
++  });
++});
+diff --git a/src/modules/media/media.validation.ts b/src/modules/media/media.validation.ts
+index a6477de..a897f86 100644
+--- a/src/modules/media/media.validation.ts
++++ b/src/modules/media/media.validation.ts
+@@ -6,6 +6,29 @@ export const publicMediaParams = z.object({
+   key: z.string().regex(/^[0-9a-f-]{36}\.(jpg|png|webp|mp4|webm)$/i),
+ });
+ 
++// `purpose=menu` : vidéo d'un plat du menu interactif, soumise à une durée maximale (plan_limits.maxMenuVideoSeconds).
++export const mediaUploadQuery = z.object({ purpose: z.enum(["menu"]).optional() });
++export type MediaPurpose = z.infer<typeof mediaUploadQuery>["purpose"];
++
++/** Lit la durée (secondes) affichée par `ffprobe -show_entries format=duration`. */
++export function parseProbeDuration(output: string): number | null {
++  const value = Number.parseFloat(output.trim().split(/\r?\n/)[0] ?? "");
++  return Number.isFinite(value) && value >= 0 ? value : null;
++}
++
++/** Tolérance de 0,5 s, comme le contrôle fait côté navigateur. */
++export function assertMenuVideoDuration(seconds: number | null, maxSeconds: number) {
++  if (seconds === null) {
++    throw unprocessable("DUREE_VIDEO_INCONNUE", "Impossible de lire la durée de la vidéo");
++  }
++  if (seconds > maxSeconds + 0.5) {
++    throw unprocessable(
++      "VIDEO_TROP_LONGUE",
++      `Une vidéo de menu ne peut pas dépasser ${maxSeconds} secondes`
++    );
++  }
++}
++
+ export const MEDIA_FORMATS = {
+   "image/jpeg": { extension: "jpg", kind: "image" },
+   "image/png": { extension: "png", kind: "image" },

@@ -1,0 +1,5 @@
+# Netlify — règles lues de haut en bas (équivalent de vercel.json). Remplacer PROJECT_REF et URL_OUTIL_MEMBRES.
+/secteurs/immobilier   /promoteur-immobilier                                               301
+/q/:code               https://PROJECT_REF.supabase.co/functions/v1/qr-redirect?c=:code    200
+/f/:slug               https://URL_OUTIL_MEMBRES/f/:slug                                   200
+/*                     /index.html                                                         200

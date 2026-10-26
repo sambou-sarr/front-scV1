@@ -1,0 +1,98 @@
+/* ============================================================
+   Page Branding intelligent — styles spécifiques
+   Techniques : travelling « caméra » (zoom + panoramique) piloté par le scroll,
+   inclinaison 3D au pointeur, cadres de scan animés, zoom au survol centré sur le QR.
+   ============================================================ */
+
+/* ---------- HERO ---------- */
+.b-hero-grid{position:relative;display:grid;grid-template-columns:1fr 1.15fr;gap:40px;align-items:center;width:100%}
+.b-hero-vis{perspective:1200px}
+.b-tilt{position:relative;transform-style:preserve-3d;will-change:transform}
+.b-tilt img{width:100%;filter:drop-shadow(0 30px 40px rgba(0,0,0,.6));opacity:0;transform:translateY(30px);transition:opacity .9s .2s,transform .9s .2s cubic-bezier(.2,.8,.2,1)}
+.b-hero.go .b-tilt img{opacity:1;transform:none}
+.b-mark{position:absolute;transform:translate(-50%,-50%);opacity:0;transition:opacity .6s}
+.b-hero.go .b-mark.front{opacity:1;transition-delay:1s}
+.b-hero.go .b-mark.back{opacity:1;transition-delay:1.5s}
+.b-mark i{display:block;width:clamp(56px,7vw,96px);aspect-ratio:1;
+  --c:var(--rouge);
+  background:linear-gradient(var(--c),var(--c)) 0 0/22% 3px,linear-gradient(var(--c),var(--c)) 0 0/3px 22%,
+    linear-gradient(var(--c),var(--c)) 100% 0/22% 3px,linear-gradient(var(--c),var(--c)) 100% 0/3px 22%,
+    linear-gradient(var(--c),var(--c)) 0 100%/22% 3px,linear-gradient(var(--c),var(--c)) 0 100%/3px 22%,
+    linear-gradient(var(--c),var(--c)) 100% 100%/22% 3px,linear-gradient(var(--c),var(--c)) 100% 100%/3px 22%;
+  background-repeat:no-repeat;animation:frame 2.2s ease-in-out infinite}
+@keyframes frame{50%{transform:scale(1.1)}}
+.b-mark b{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;background:#fff;color:var(--txt);font:600 12.5px var(--sans);padding:6px 12px;border-radius:20px;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.b-mark.front b{bottom:calc(100% + 8px)}
+.b-mark.back b{top:calc(100% + 8px);background:var(--rouge);color:#fff}
+@media (max-width:900px){
+  .b-hero-grid{grid-template-columns:1fr;gap:26px}
+  .b-hero-vis{order:-1}
+  .b-mark b{font-size:11px;padding:4px 9px}
+}
+
+/* ---------- TRAVELLING TENUES (sticky) ---------- */
+.wear{position:relative;background:#fff}
+.we-tabs{list-style:none;margin:0 0 18px;padding:0;display:flex;gap:6px;flex-wrap:wrap}
+.we-tabs li{border:1px solid var(--gris-l);border-radius:20px;padding:6px 12px;font:600 12.5px var(--sans);color:#9a9a9a;transition:all .3s}
+.we-tabs li.done{color:var(--txt)}
+.we-tabs li.on{background:var(--noir);border-color:var(--noir);color:#fff}
+.we-line{margin:0 0 10px;font:500 clamp(24px,2.3vw,34px)/1.1 var(--serif);letter-spacing:-.015em;animation:psIn .5s both;min-height:2.3em}
+.we-use{margin:0 0 20px;color:var(--gris)}
+.we-txt .j-prog{width:200px}
+.we-frame{position:absolute;left:0;top:50%;transform:translateY(-50%);width:80%;aspect-ratio:1200/795;overflow:hidden;border-radius:18px;background:radial-gradient(circle at 50% 40%,#faf8f4,#ece8e1)}
+.we-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:opacity .5s;will-change:transform,opacity}
+.we-scan{position:absolute;left:50%;top:50%;width:21%;aspect-ratio:1;transform:translate(-50%,-50%);opacity:0;transition:opacity .35s;pointer-events:none}
+.we-scan i{position:absolute;width:26%;height:26%;border:3px solid var(--rouge)}
+.we-scan i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+.we-scan i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+.we-scan i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+.we-scan i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+.we-scan::after{content:"";position:absolute;left:4%;right:4%;height:2px;top:10%;background:var(--rouge);box-shadow:0 0 12px var(--rouge);animation:scanLine 1.4s ease-in-out infinite alternate}
+@keyframes scanLine{to{top:88%}}
+.phone.static.we-phone{position:absolute;right:0;bottom:4%;--pw:min(230px,20vw);opacity:0;transform:translateY(30px) rotate(4deg);transition:opacity .5s,transform .6s cubic-bezier(.2,.8,.2,1);z-index:3}
+.phone.static.we-phone.on{opacity:1;transform:none}
+.we-page{position:absolute;inset:0;background:#0c0c0c;padding:18cqw 6cqw 6cqw;display:flex;flex-direction:column;gap:2.8cqw}
+.we-brand{margin:0 0 3cqw;text-align:center}
+.we-brand b{display:block;font:600 6.6cqw var(--serif);letter-spacing:.06em;color:var(--bc)}
+.we-brand small{font-size:3.4cqw;color:#9b958e}
+.we-act{display:block;background:#f4f1ec;color:#141414;border-radius:99px;padding:3.2cqw 4.5cqw;font:500 4.1cqw var(--sans)}
+.we-phone.on .we-page>*{animation:psIn .45s both}
+.we-phone.on .we-page>*:nth-child(2){animation-delay:.1s}.we-phone.on .we-page>*:nth-child(3){animation-delay:.2s}.we-phone.on .we-page>*:nth-child(4){animation-delay:.3s}.we-phone.on .we-page>*:nth-child(5){animation-delay:.4s}
+@media (max-width:900px){
+  .we-frame{width:100%;top:0;transform:none}
+  .phone.static.we-phone{--pw:min(160px,38vw);bottom:0;right:0}
+  .we-txt{text-align:center}
+  .we-tabs{justify-content:center;margin-bottom:10px}
+  .we-line{font-size:22px;min-height:2.3em;margin-bottom:4px}
+  .we-use{font-size:14px;margin-bottom:14px}
+  .we-txt .j-prog{display:none}
+}
+
+/* ---------- TROIS TENUES ---------- */
+.wp{background:var(--ivoire);padding:clamp(80px,10vw,130px) 0}
+.wp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.wp-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.06);padding-bottom:22px;outline:none}
+.wp-card:focus-visible{box-shadow:0 0 0 3px var(--rouge)}
+.wp-img{aspect-ratio:1.4;overflow:hidden;background:radial-gradient(circle at 50% 40%,#fbf9f5,#ece8e1)}
+.wp-img img{width:100%;height:100%;object-fit:contain;transition:transform .8s cubic-bezier(.2,.8,.2,1)}
+.wp-card:hover .wp-img img,.wp-card:focus .wp-img img{transform:scale(2.3)}
+.wp-name{margin:20px 22px 6px;font:600 12px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--rouge)}
+.wp-text{margin:0 22px;color:#2b2d30;line-height:1.55}
+@media (max-width:640px){.wp-grid{grid-template-columns:1fr}}
+@media (min-width:641px) and (max-width:900px){.wp-grid{gap:12px}.wp-name{margin:14px 14px 4px}.wp-text{margin:0 14px;font-size:14px}}
+
+/* ---------- OBJETS DE MARQUE ---------- */
+.objs{background:var(--noir);color:#fff;padding:clamp(80px,10vw,130px) 0}
+.ob-head{margin-bottom:36px}
+.ob-head p:not(.label){color:#cfccc6;margin:14px 0 0;font-size:17px}
+.ob-photo{position:relative;border-radius:18px;overflow:hidden}
+.ob-photo img{width:100%;display:block}
+.ob-photo .spot{transition-delay:calc(var(--i) * .18s + .3s)}
+.ob-photo .spot i{display:grid;place-items:center;font:700 0px var(--sans);color:#fff}
+.ob-legend{display:none}
+@media (max-width:900px){
+  .ob-photo .spot b{display:none}
+  .ob-photo .spot i{width:20px;height:20px;font-size:10.5px}
+  .ob-legend{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:20px 0 0;padding-left:22px;color:#cfccc6;font-size:14px}
+  .ob-legend li::marker{color:var(--rouge);font-weight:700}
+}
