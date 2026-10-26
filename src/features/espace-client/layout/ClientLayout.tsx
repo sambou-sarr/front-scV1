@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import "../../../styles/layout.css";
 import { useSession } from "../../../lib/session";
@@ -49,7 +48,10 @@ const NAV: {
     label: "Tableau de bord",
     icon: "grid",
     match: p =>
-      p === BASE || p === `${BASE}/` || p.startsWith(`${BASE}/fiches`),
+      p === BASE ||
+      p === `${BASE}/` ||
+      p.startsWith(`${BASE}/fiches`) ||
+      p.startsWith(`${BASE}/fiche/preview/`),
   },
   {
     to: `${BASE}/editeur`,
@@ -82,27 +84,18 @@ const NAV: {
     match: p => p.startsWith(`${BASE}/parametres`),
   },
 ];
+const MOBILE_LABEL: Record<string, string> = {
+  "Tableau de bord": "Accueil",
+  "Éditeur de fiches": "Éditer",
+  Brouillons: "Brouillons",
+  "Demandes de rappel": "Rappels",
+  "Abonnements & formules": "Formules",
+  Paramètres: "Réglages",
+};
 
 export default function ClientLayout({ children }: { children?: ReactNode }) {
   const { pathname } = useLocation();
   const user = useSession()?.user;
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open]);
 
   // Prévient le serveur puis supprime la session ; <RequireAuth> renvoie alors vers /login.
   const logout = () => void signOut();
@@ -111,26 +104,10 @@ export default function ClientLayout({ children }: { children?: ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className={`cl${open ? " open" : ""}`}>
+    <div className="cl">
       <a className="cl-skip" href="#cl-main">
         Aller au contenu
       </a>
-
-      <header className="cl-bar">
-        <button
-          className="cl-burger"
-          onClick={() => setOpen(true)}
-          aria-label="Ouvrir le menu"
-          aria-expanded={open}
-          aria-controls="cl-nav"
-        >
-          <Ico n="menu" />
-        </button>
-        <span className="cl-brand sm">
-          <img src="/images/symbole-s.webp" alt="" width="28" height="28" />{" "}
-          Support Connecté
-        </span>
-      </header>
 
       <aside
         className="cl-side"
@@ -144,13 +121,6 @@ export default function ClientLayout({ children }: { children?: ReactNode }) {
               Support Connecté<small>Espace client</small>
             </span>
           </span>
-          <button
-            className="cl-close"
-            onClick={() => setOpen(false)}
-            aria-label="Fermer le menu"
-          >
-            <Ico n="x" />
-          </button>
         </div>
         <nav aria-label="Principal">
           <ul className="cl-nav">
@@ -164,7 +134,7 @@ export default function ClientLayout({ children }: { children?: ReactNode }) {
                     aria-current={on ? "page" : undefined}
                   >
                     <Ico n={n.icon} />
-                    {n.label}
+                    <span>{n.label}</span>
                   </Link>
                 </li>
               );
@@ -188,15 +158,33 @@ export default function ClientLayout({ children }: { children?: ReactNode }) {
           </button>
         </div>
       </aside>
-      <div
-        className="cl-scrim"
-        onClick={() => setOpen(false)}
-        aria-hidden="true"
-      />
 
       <main id="cl-main" className="cl-main" tabIndex={-1}>
         {children ?? <Outlet context={{ user }} />}
       </main>
+      <nav className="cl-tabbar" aria-label="Navigation mobile">
+        {NAV.map(n => {
+          const on = n.match(pathname);
+          const label = MOBILE_LABEL[n.label] ?? n.label;
+          return (
+            <Link
+              key={n.to}
+              to={n.to}
+              className={on ? "on" : undefined}
+              aria-current={on ? "page" : undefined}
+              aria-label={n.label}
+              title={n.label}
+            >
+              <Ico n={n.icon} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+        <button onClick={logout} aria-label="Se déconnecter" title="Se déconnecter">
+          <Ico n="out" />
+          <span>Quitter</span>
+        </button>
+      </nav>
     </div>
   );
 }

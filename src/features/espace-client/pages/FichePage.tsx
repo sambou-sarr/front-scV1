@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { CardRequestPanel } from "../components/CardRequestPanel";
@@ -22,10 +22,14 @@ type PassageStats = {
   }>;
 };
 
+const HISTORY_PAGE_SIZE = 6;
+
 function PassageStatsPanel({ ficheId }: { ficheId: number }) {
   const [granularity, setGranularity] = useState<"day" | "month">("month");
   const [date, setDate] = useState("");
   const [month, setMonth] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  useEffect(() => setHistoryPage(1), [granularity, date, month]);
 
   const statsQuery = useQuery({
     queryKey: ["fiche-passage-stats", ficheId, granularity, date, month],
@@ -43,6 +47,12 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
   });
 
   const stats = statsQuery.data;
+  const history = [...(stats?.history ?? [])].reverse();
+  const historyPageCount = Math.ceil(history.length / HISTORY_PAGE_SIZE);
+  const visibleHistory = history.slice(
+    (historyPage - 1) * HISTORY_PAGE_SIZE,
+    historyPage * HISTORY_PAGE_SIZE,
+  );
   const countCards = [
     { label: "Total des passages", value: stats?.totals.total ?? 0, key: "total" },
     { label: "QR code", value: stats?.totals.qr ?? 0, key: "qr" },
@@ -131,7 +141,7 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...stats.history].reverse().map(row => (
+                    {visibleHistory.map(row => (
                       <tr key={row.period}>
                         <td>{row.period}</td>
                         <td>{row.total.toLocaleString("fr-FR")}</td>
@@ -145,6 +155,35 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
               </div>
             ) : (
               <p className="fiche-passage-empty">Aucun passage enregistré pour cette période.</p>
+            )}
+            {historyPageCount > 1 && (
+              <nav className="fiche-passage-pagination" aria-label="Pagination de l’historique">
+                <span>
+                  {((historyPage - 1) * HISTORY_PAGE_SIZE) + 1}–
+                  {Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} sur {history.length}
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage(page => Math.max(1, page - 1))}
+                    disabled={historyPage === 1}
+                    aria-label="Page précédente de l’historique"
+                  >
+                    ← Précédent
+                  </button>
+                  <span aria-live="polite">
+                    {historyPage} / {historyPageCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage(page => Math.min(historyPageCount, page + 1))}
+                    disabled={historyPage === historyPageCount}
+                    aria-label="Page suivante de l’historique"
+                  >
+                    Suivant →
+                  </button>
+                </div>
+              </nav>
             )}
           </div>
         </>
@@ -254,14 +293,25 @@ function FicheDashboardPanel({
   ficheId,
   formula,
   eligible,
+  ficheName,
 }: {
   ficheId: number;
   formula: string;
   eligible: boolean;
+  ficheName: string;
 }) {
   const [activeSection, setActiveSection] = useState<
     "overview" | "rappels" | "carte"
   >("overview");
+  const [cardDialogOpen, setCardDialogOpen] = useState(false);
+  useEffect(() => {
+    if (!cardDialogOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCardDialogOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [cardDialogOpen]);
   const sections = [
     { id: "overview" as const, label: "Statistiques", description: "Passages et sources" },
     { id: "rappels" as const, label: "Demandes de rappel", description: "Coordonnées reçues" },
@@ -273,7 +323,7 @@ function FicheDashboardPanel({
       <header className="fiche-dashboard-header">
         <div>
           <h2>Tableau de bord de la fiche</h2>
-          <p>Retrouvez ici les statistiques et les interactions reçues. D’autres modules pourront être ajoutés sans modifier les blocs existants.</p>
+          <p>Suivez les passages, les demandes de rappel et le suivi de votre carte.</p>
         </div>
       </header>
       <nav className="fiche-dashboard-nav" aria-label="Rubriques du tableau de bord de la fiche">
@@ -295,11 +345,68 @@ function FicheDashboardPanel({
       ) : activeSection === "rappels" ? (
         <RappelsPanel ficheId={ficheId} />
       ) : (
-        <CardRequestPanel
-          ficheId={ficheId}
-          formula={formula}
-          eligible={eligible}
-        />
+        <section className="fiche-card-request">
+          <div className="fiche-card-request-art" aria-hidden="true">
+            <span>Support Connecté</span>
+            <strong>{formula}</strong>
+            <i />
+            <i />
+          </div>
+          <div className="fiche-card-request-copy">
+            <p className="fiche-card-request-eyebrow">Carte physique NFC</p>
+            <h3>Votre fiche, toujours à portée de main.</h3>
+            <p>
+              Demandez une carte NFC liée à cette fiche. Indiquez vos
+              coordonnées de livraison et notre équipe s’occupe du suivi.
+            </p>
+            <button
+              type="button"
+              className="fiche-card-request-button"
+              onClick={() => setCardDialogOpen(true)}
+            >
+              Demander une carte <span aria-hidden="true">↗</span>
+            </button>
+          </div>
+          {cardDialogOpen && (
+            <div
+              className="fiche-card-dialog-backdrop"
+              onMouseDown={event => {
+                if (event.target === event.currentTarget) {
+                  setCardDialogOpen(false);
+                }
+              }}
+            >
+              <section
+                className="fiche-card-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="fiche-card-dialog-title"
+              >
+                <header>
+                  <div>
+                    <p className="fiche-card-request-eyebrow">Carte physique NFC</p>
+                    <h3 id="fiche-card-dialog-title">
+                      Demande de carte — {ficheName}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={() => setCardDialogOpen(false)}
+                    aria-label="Fermer la demande de carte"
+                  >
+                    ×
+                  </button>
+                </header>
+                <CardRequestPanel
+                  ficheId={ficheId}
+                  formula={formula}
+                  eligible={eligible}
+                />
+              </section>
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
@@ -386,7 +493,6 @@ export function FichePage() {
         >
           Fiche publique ↗
         </a>
-        <span>La prévisualisation privée ne compte pas comme passage.</span>
       </div>
       <div className="fiche-preview-layout">
         <div className="fiche-preview-stage">
@@ -399,7 +505,8 @@ export function FichePage() {
         <FicheDashboardPanel
           ficheId={fiche.id}
           formula={fiche.formule}
-          eligible={fiche.statut === "ACTIVE" && !fiche.expiree}
+          eligible={fiche.statut === "active" && !fiche.expiree}
+          ficheName={`${fiche.prenom} ${fiche.nom}`.trim()}
         />
       </div>
     </section>
