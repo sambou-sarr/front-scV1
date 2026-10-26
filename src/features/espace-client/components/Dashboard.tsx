@@ -25,8 +25,8 @@ import {
   pageFiches,
   type FicheListFilters,
 } from "../lib/ficheList";
-import { FicheListControls, FichePagination } from "./FicheListControls";
 import CreateFicheForm from "../pages/CreateFicheForm";
+import { FicheListControls, FichePagination } from "./FicheListControls";
 
 /*
   Tableau de bord de l'espace client. Données : GET client/dashboard/fiches (TanStack Query, hook useDashboardFiches).
@@ -80,7 +80,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
   const [page, setPage] = useState(1);
   const filteredFiches = useMemo(
     () => filterFiches(fiches ?? [], filters),
-    [fiches, filters],
+    [fiches, filters]
   );
   const pageData = pageFiches(filteredFiches, page);
   const updateFilters = (next: FicheListFilters) => {
@@ -180,15 +180,12 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
       </div>
     );
 
-  const cur =
-    pageData.items.find(f => f.slug === sel) ?? pageData.items[0];
+  const cur = pageData.items.find(f => f.slug === sel) ?? pageData.items[0];
   const url = cur ? publicUrl(cur.slug) : "";
   const missing = cur ? checks(cur).filter(c => !c.ok) : [];
   const pc = cur ? completion(cur) : 0;
   const scans = fiches.reduce((s, f) => s + f.scansTotal, 0);
-  const alerts = fiches.filter(
-    f => !["ok", "draft"].includes(health(f)),
-  );
+  const alerts = fiches.filter(f => !["ok", "draft"].includes(health(f)));
   const last = fiches.reduce(
     (a, f) => (f.updatedAt > a ? f.updatedAt : a),
     fiches[0].updatedAt
@@ -269,79 +266,81 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
               </button>
             </div>
           ) : (
-          <ul className="db-list">
-            {pageData.items.map(f => {
-              const h = health(f),
-                c = completion(f);
-              return (
-                <li key={f.id} className={f.id === cur.id ? "on" : ""}>
-                  <button
-                    className="db-pick"
-                    onClick={() => setSel(f.slug)}
-                    aria-pressed={f.id === cur.id}
-                  >
-                    <span className="db-av">
-                      {f.logo ? (
-                        <img src={f.logo} alt="" />
-                      ) : (
-                        displayName(f).charAt(0)
-                      )}
-                    </span>
-                    <span className="db-meta">
-                      <b>{displayName(f)}</b>
-                      <small>{f.fonction}</small>
-                    </span>
-                    {f.secteur && (
-                      <em className="db-tag">{SECTEUR_LABEL[f.secteur]}</em>
-                    )}
-                  </button>
-                  <div className="db-row">
-                    <span className={`db-pill ${PILL[h].cls}`}>
-                      {PILL[h].text(daysLeft(subscriptionEndsAt(f)))}
-                    </span>
-                    {(f.subscriptions?.[0] ?? f.abonnementActif) && (
-                      <span className="db-plan">
-                        {(f.subscriptions?.[0] ?? f.abonnementActif)?.plan
-                          .nom ??
-                          (f.subscriptions?.[0] ?? f.abonnementActif)?.plan
-                            .type}
+            <ul className="db-list">
+              {pageData.items.map(f => {
+                const h = health(f),
+                  c = completion(f);
+                return (
+                  <li key={f.id} className={f.id === cur.id ? "on" : ""}>
+                    <button
+                      className="db-pick"
+                      onClick={() => setSel(f.slug)}
+                      aria-pressed={f.id === cur.id}
+                    >
+                      <span className="db-av">
+                        {f.logo ? (
+                          <img src={f.logo} alt="" />
+                        ) : (
+                          displayName(f).charAt(0)
+                        )}
                       </span>
-                    )}
-                    {f.enLigneSeule &&
-                      !(f.subscriptions?.[0] ??
-                        f.abonnementActif) && (
-                      <span className="db-plan free">Créée gratuitement</span>
-                    )}
-                    <span className="db-scans">
-                      <b>{f.scansTotal}</b> passage{f.scansTotal > 1 ? "s" : ""}
-                    </span>
-                    <span className="db-act">
-                      <button onClick={() => onView(f.slug)}>Voir</button>
-                      {h !== "draft" && (
-                        <a
-                          className="db-public-link"
-                          href={`/f/${encodeURIComponent(f.slug)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Fiche publique
-                        </a>
+                      <span className="db-meta">
+                        <b>{displayName(f)}</b>
+                        <small>{f.fonction}</small>
+                      </span>
+                      {f.secteur && (
+                        <em className="db-tag">{SECTEUR_LABEL[f.secteur]}</em>
                       )}
-                      <button className="pri" onClick={() => onEdit(f.id)}>
-                        Modifier
-                      </button>
-                    </span>
-                  </div>
-                  <div className="db-comp" title={`Fiche complète à ${c} %`}>
-                    <i>
-                      <u style={{ width: `${c}%` }} />
-                    </i>
-                    <span>{c} % complète</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    </button>
+                    <div className="db-row">
+                      <span className={`db-pill ${PILL[h].cls}`}>
+                        {PILL[h].text(daysLeft(subscriptionEndsAt(f)))}
+                      </span>
+                      {(f.subscriptions?.[0] ?? f.abonnementActif) && (
+                        <span className="db-plan">
+                          {(f.subscriptions?.[0] ?? f.abonnementActif)?.plan
+                            .nom ??
+                            (f.subscriptions?.[0] ?? f.abonnementActif)?.plan
+                              .type}
+                        </span>
+                      )}
+                      {f.enLigneSeule &&
+                        !(f.subscriptions?.[0] ?? f.abonnementActif) && (
+                          <span className="db-plan free">
+                            Créée gratuitement
+                          </span>
+                        )}
+                      <span className="db-scans">
+                        <b>{f.scansTotal}</b> passage
+                        {f.scansTotal > 1 ? "s" : ""}
+                      </span>
+                      <span className="db-act">
+                        <button onClick={() => onView(f.slug)}>Voir</button>
+                        {h !== "draft" && (
+                          <a
+                            className="db-public-link"
+                            href={`/f/${encodeURIComponent(f.slug)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Fiche publique
+                          </a>
+                        )}
+                        <button className="pri" onClick={() => onEdit(f.id)}>
+                          Modifier
+                        </button>
+                      </span>
+                    </div>
+                    <div className="db-comp" title={`Fiche complète à ${c} %`}>
+                      <i>
+                        <u style={{ width: `${c}%` }} />
+                      </i>
+                      <span>{c} % complète</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
           <FichePagination
             currentPage={pageData.currentPage}
@@ -353,62 +352,54 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           />
           {fiches.some(
             f =>
-              f.enLigneSeule &&
-              !f.subscriptions?.length &&
-              !f.abonnementActif,
-          ) && (
-            <aside className="db-up" id="upgrade">
-              <div>
-                <b>Allez plus loin avec une formule Pro ou Signature</b>
-                <p>
-                  Catalogue, galerie, avis Google, menu vidéo, biens immobiliers
-                  et statistiques de scans.
-                </p>
-              </div>
-              <a href="#upgrade">Découvrir</a>
-            </aside>
+              f.enLigneSeule && !f.subscriptions?.length && !f.abonnementActif
           )}
         </section>
 
-        {cur && <aside className="db-side" aria-label={`Détail de ${displayName(cur)}`}>
-          <div className="db-card db-share">
-            <h2>Partager</h2>
-            {health(cur) === "draft" ? (
+        {cur && (
+          <aside
+            className="db-side"
+            aria-label={`Détail de ${displayName(cur)}`}
+          >
+            <div className="db-card db-share">
+              <h2>Partager</h2>
+              {health(cur) === "draft" ? (
+                <p className="db-sub2">
+                  Publiez cette fiche depuis l’éditeur pour activer son lien
+                  public.
+                </p>
+              ) : (
+                <>
+                  <code>{url.replace("https://", "")}</code>
+                  <button className="db-copy" onClick={copy} aria-live="polite">
+                    {copied ? "Lien copié ✓" : "Copier le lien"}
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="db-card">
+              <h2>Compléter « {displayName(cur)} »</h2>
               <p className="db-sub2">
-                Publiez cette fiche depuis l’éditeur pour activer son lien
-                public.
+                {pc === 100
+                  ? "Votre fiche est complète, bravo."
+                  : `${missing.length} élément${missing.length > 1 ? "s" : ""} à ajouter pour convaincre vos clients.`}
               </p>
-            ) : (
-              <>
-                <code>{url.replace("https://", "")}</code>
-                <button className="db-copy" onClick={copy} aria-live="polite">
-                  {copied ? "Lien copié ✓" : "Copier le lien"}
+              <ul className="db-todo">
+                {checks(cur).map(c => (
+                  <li key={c.key} className={c.ok ? "ok" : ""}>
+                    <span aria-hidden="true">{c.ok ? "✓" : ""}</span>
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+              {pc < 100 && (
+                <button className="db-copy pri" onClick={() => onEdit(cur.id)}>
+                  Compléter ma fiche
                 </button>
-              </>
-            )}
-          </div>
-          <div className="db-card">
-            <h2>Compléter « {displayName(cur)} »</h2>
-            <p className="db-sub2">
-              {pc === 100
-                ? "Votre fiche est complète, bravo."
-                : `${missing.length} élément${missing.length > 1 ? "s" : ""} à ajouter pour convaincre vos clients.`}
-            </p>
-            <ul className="db-todo">
-              {checks(cur).map(c => (
-                <li key={c.key} className={c.ok ? "ok" : ""}>
-                  <span aria-hidden="true">{c.ok ? "✓" : ""}</span>
-                  {c.label}
-                </li>
-              ))}
-            </ul>
-            {pc < 100 && (
-              <button className="db-copy pri" onClick={() => onEdit(cur.id)}>
-                Compléter ma fiche
-              </button>
-            )}
-          </div>
-        </aside>}
+              )}
+            </div>
+          </aside>
+        )}
       </div>
       {createDialog}
     </div>

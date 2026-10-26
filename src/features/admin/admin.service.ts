@@ -12,6 +12,9 @@ import type {
   FichesPage,
   Formule,
   FormuleReglage,
+  LeadRequest,
+  LeadRequestsPage,
+  LeadStatus,
   ListFichesParams,
   Parametres,
   PatchEmplacements,
@@ -209,4 +212,13 @@ export const adminApi = {
     page?: number;
     limit?: number;
   }) => get<UsersPage>("/admin/users", { ...p }),
+
+  listLeads: (p: {
+    search?: string;
+    status?: LeadStatus;
+    page?: number;
+    limit?: number;
+  } = {}) => get<LeadRequestsPage>("/admin/leads", { ...p }),
+  updateLeadStatus: (id: number, status: LeadStatus) =>
+    patch<{ lead: LeadRequest }>(`/admin/leads/${id}`, { status }),
 };

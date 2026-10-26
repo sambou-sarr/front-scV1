@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../admin.service';
 import { errMsg } from '../../../lib/apiError';
 import { Badge, Btn, ConfirmModal, Empty, Field, Icon, Seg, useAction, useToast } from '../components/ui';
@@ -90,11 +91,15 @@ const Toggle = ({ checked, onChange, children }: { checked: boolean; onChange: (
 );
 
 export default function QrCodes() {
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const run = useAction();
-  const [content, setContent] = useState<ContentForm>(DEFAULT_CONTENT);
+  const [content, setContent] = useState<ContentForm>(() => ({
+    ...DEFAULT_CONTENT,
+    url: searchParams.get('url') ?? '',
+  }));
   const [style, setStyle] = useState<StyleForm>(DEFAULT_STYLE);
-  const [nom, setNom] = useState('');
+  const [nom, setNom] = useState(() => searchParams.get('nom') ?? '');
   const [format, setFormat] = useState<QrFormat>('png');
   const [preview, setPreview] = useState<QrApercu | null>(null);
   const [previewErr, setPreviewErr] = useState('');

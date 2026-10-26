@@ -4,12 +4,6 @@
 import { CONTACT } from './apropos';
 export { CONTACT };
 
-// Réglage de l'envoi : laisser vide = ouverture de la messagerie avec la demande pré-remplie.
-// Renseigner une URL (API, Formspree, CRM…) pour un envoi direct en JSON (POST).
-const ENV: Partial<ImportMetaEnv> = (typeof import.meta !== 'undefined' && import.meta.env) || {};
-// Back-office : https://<PROJECT_REF>.supabase.co/functions/v1/lead-intake (variable VITE_LEAD_ENDPOINT du fichier .env)
-export const LEAD_ENDPOINT = ENV.VITE_LEAD_ENDPOINT || '';
-
 export const PLACE = {
   address: 'Saly Niakh Niakhal, Mbour', // À VÉRIFIER : adresse publique à afficher
   maps: 'https://www.google.com/maps/search/?api=1&query=Saly%20Niakh%20Niakhal%20Mbour',
@@ -44,7 +38,7 @@ export const C_MAP = {
   ],
 };
 
-// V6 — Formulaire de contact simple (page Contact). intent : valeur reçue par lead-intake (devis | demo | question).
+// V6 — Formulaire de contact simple (page Contact). intent : devis | demo | question.
 export const C_FORM = {
   label: 'Nous écrire',
   title: 'Dites-nous ce qu’il vous faut,',
@@ -63,5 +57,5 @@ export const C_FORM = {
   hint: '* Votre nom, et un téléphone ou un e-mail.',
   send: 'Envoyer ma demande',
   errors: { name: 'Indiquez votre nom.', reach: 'Laissez un téléphone ou un e-mail.', email: 'Adresse e-mail invalide.', phone: 'Numéro incomplet.', fail: 'L’envoi a échoué. Réessayez, ou appelez-nous directement.' },
-  done: { title: 'Demande envoyée', text: 'Merci : un conseiller vous recontacte rapidement. Devis chiffré et détaillé, sans engagement.', mailto: 'Votre messagerie s’est ouverte avec la demande pré-remplie : il ne reste qu’à l’envoyer.', again: 'Nouvelle demande' },
+  done: { title: 'Demande envoyée', text: 'Merci : un conseiller vous recontacte rapidement. Devis chiffré et détaillé, sans engagement.', again: 'Nouvelle demande' },
 };

@@ -33,7 +33,7 @@ interface Design {
 }
 type Errors = Partial<Record<FieldKey | 'reach' | 'file', string>>;
 type FileKind = 'logo' | 'back' | 'bg';
-type State = 'edit' | 'encoding' | 'done' | 'done-attach' | 'fail';
+type State = 'edit' | 'encoding' | 'done' | 'fail';
 const EMPTY: Fields = { name: '', role: '', company: '', phone: '', email: '' };
 const D0: Design = { bg: 'noir', upload: null, uploadName: '', uploadData: '', logo: null, logoName: '', logoData: '', logoSize: 62,
   accent: '#c9a25b', ink: null, zoom: 100, posX: 50, posY: 50, dim: 40,
@@ -57,6 +57,7 @@ export default function CardStudio({ id = 'creer-ma-carte', designer = false }: 
   const ess = tier === 'essentielle', sig = tier === 'signature', pro = tier === 'pro';
   const P = DESIGNER.presets.find((p) => p.id === ds.bg);
   const PB = DESIGNER.presets.find((p) => p.id === (ds.back === 'same' ? ds.bg : ds.back));
+  const files = [ds.logoName, sig && ds.uploadName, sig && ds.backUploadName].filter((x): x is string => Boolean(x));
 
   useEffect(() => {
     // Les boutons des niveaux (TiersSection, HandTrio) choisissent le niveau : événement « studio:tier »
@@ -119,7 +120,6 @@ export default function CardStudio({ id = 'creer-ma-carte', designer = false }: 
         fond_fichier: ds.uploadData || undefined, fond_verso_fichier: ds.backUploadData || undefined } : {}),
       logo_fichier: ds.logoData || undefined,
     } : null;
-    const files = [ds.logoName, sig && ds.uploadName, sig && ds.backUploadName].filter((x): x is string => Boolean(x));
     const now = new Date().toISOString();
     const payload: LeadBase & Record<string, unknown> = {
       intent: 'maquette',
@@ -128,16 +128,16 @@ export default function CardStudio({ id = 'creer-ma-carte', designer = false }: 
       phone: d.phone.trim(), email: d.email.trim(), city: '', prefer: '',
       message: [`Fonction : ${d.role.trim() || '—'}`,
         design ? `Design : recto logo (${design.logo}, taille ${design.taille_logo} %)${sig ? ` · fond ${design.fond} · verso ${design.fond_verso} · accent ${design.accent} · textes ${design.couleur_textes}` : ''}` : null,
-        design && files.length ? `Fichiers : ${files.join(', ')} (joints à cet e-mail)` : null,
+        design && files.length ? `Fichiers personnalisés : ${files.join(', ')} (à transmettre séparément)` : null,
         `Consentement marketing : ${optin ? 'OUI' : 'NON'} (${now})`].filter(Boolean).join('\n'),
-      design, consent_marketing: optin, consent_text: optin ? STUDIO.optin : '', consent_at: now, source: designer ? 'configurateur' : 'card-studio', page: window.location.pathname,
+      design, consent_marketing: optin, consent_text: optin ? STUDIO.optin : '', consent_at: optin ? now : undefined, source: designer ? 'configurateur' : 'card-studio', page: window.location.pathname,
     };
     // Fichiers prêts à imprimer (Evolis, 300 dpi) : exactement la carte que le client vient de valider
     const pf = await renderCard({ tier, ds: { ...ds, bgImg: P?.img, backImg: PB?.img }, fields: { name: d.name.trim(), role: d.role.trim(), company: d.company.trim(), phone: d.phone.trim(), email: d.email.trim() }, url: ficheUrl(slug), logoFallback: '/images/logo-blanc.webp' });
     payload.print = { slug, url_fiche: ficheUrl(slug), recto: pf.recto, verso: pf.verso, fiche: pf.fiche };
     setPrint(pf);
     await new Promise((r) => setTimeout(r, 600));
-    try { const r = await sendLead(payload); track('studio_submit', { tier, optin, intent: payload.intent, mode: r.mode }); setState(r.mode === 'mailto' && files.length ? 'done-attach' : 'done'); }
+    try { const r = await sendLead(payload); track('studio_submit', { tier, optin, intent: payload.intent, mode: r.mode }); setState('done'); }
     catch (e) { setState('fail'); }
   };
 
@@ -155,7 +155,7 @@ export default function CardStudio({ id = 'creer-ma-carte', designer = false }: 
   const bgBack: CSSProperties | undefined = sig && backImg ? { backgroundImage: `url(${backImg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined;
   const backPreset = ds.back === 'same' ? (ds.upload ? 'upload' : ds.bg) : ds.back;
   const sendLabel = designer ? DESIGNER.send[tier] : STUDIO.send;
-  const done = state === 'done' || state === 'done-attach';
+  const done = state === 'done';
   const H = designer ? DESIGNER : STUDIO;
   const fileBtn = (kind: FileKind, label: string, has: string | null) => (
     <label className="cs-filebtn"><input type="file" accept="image/*" onChange={(e) => { readFile(e.target.files?.[0], kind); e.target.value = ''; }} />
@@ -231,7 +231,7 @@ export default function CardStudio({ id = 'creer-ma-carte', designer = false }: 
           {done ? (
             <div className="cs-done" role="status">
               <span className="cs-done-ic"><Icon id="i-check" /></span>
-              <div><b>{STUDIO.done.title}</b><span>{STUDIO.done.text}</span><small>{STUDIO.done.promise}</small>{state === 'done-attach' && <small className="cs-attach">{DESIGNER.attach}</small>}
+              <div><b>{STUDIO.done.title}</b><span>{STUDIO.done.text}</span><small>{STUDIO.done.promise}</small>{files.length > 0 && <small className="cs-attach">Les fichiers de logo ou de fond ne sont pas joints à la demande ; contactez-nous pour nous les transmettre.</small>}
                 {print && <div className="cs-print"><p><Icon id="i-check" />Votre carte est prête à imprimer · {CARD.format}</p><div>{([['recto', 'Recto'], ['verso', 'Verso']] as const).map(([k, l]) => <button key={k} type="button" onClick={() => download(print[k], `carte-${slug}-${k}-300dpi.png`)}><img src={print[k]} alt={`${l} prêt à imprimer`} /><span>{l} · télécharger</span></button>)}</div></div>}</div>
               <button className="btn btn-line dark" onClick={() => setState('edit')}>{STUDIO.done.edit}</button>
             </div>

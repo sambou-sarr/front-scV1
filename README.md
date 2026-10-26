@@ -218,8 +218,9 @@ Fichiers : `src/pages/ContactPage.tsx`, `src/components/contact/*`, `src/styles/
 | `CardStudio` (`withIntent`, ancre `#formulaire`) | « Créez votre carte » : le visiteur choisit sa demande (devis, démonstration, maquette) et son niveau, tape ses coordonnées, sa carte s'écrit en direct | Voir la section « Module Créez votre carte » plus bas |
 | `MapSection` | Où nous trouver | Carte schématique animée (aucun service de carte chargé), lien Google Maps |
 
-## À brancher
-- **Envoi** : renseigner `LEAD_ENDPOINT` dans `data/contact.ts` (API, CRM, Formspree…) → envoi direct en JSON. Tant qu'il est vide, la messagerie s'ouvre avec la demande pré-remplie.
+## Envoi et suivi des demandes
+- **Envoi** : les formulaires Contact, devis et configurateur enregistrent les demandes via `POST /api/leads` sur l’API Support Connecté.
+- **Suivi** : les administrateurs retrouvent les demandes dans « Demandes » (`/admin/demandes`) et peuvent faire évoluer leur statut.
 - **Pré-remplissage depuis les autres pages** : `/contact?sujet=devis|demo|maquette#formulaire`. Le bouton « Demander un devis » du header l'utilise déjà (`sujet=devis`).
 - **Mesure** : événements `studio_start`, `studio_intent`, `studio_tier`, `studio_submit`, `contact_copy`, `map_open` (voir `utils/track.ts`).
 - **À vérifier** : adresse publique affichée (`PLACE.address`), horaires d'ouverture (non affichés, faute d'information), mention légale de protection des données (CDP Sénégal) sous le formulaire.
@@ -234,7 +235,7 @@ Fichiers : `src/components/studio/CardStudio.tsx`, `src/styles/studio.css`, text
 
 - Le visiteur choisit son niveau (Essentielle recto seul, Pro rouge recto-verso, Signature dorée recto-verso) et tape ses coordonnées : la carte s'écrit en direct, avec un curseur sur la ligne en cours de saisie. Inclinaison 3D, retournement recto / verso.
 - Sur mobile, la carte reste collée en haut de l'écran pendant la saisie.
-- À la validation : effet d'encodage (faisceau + ondes NFC), puis envoi via `utils/lead.ts` (même réglage `LEAD_ENDPOINT` que la page Contact).
+- À la validation : effet d'encodage (faisceau + ondes NFC), puis envoi via `utils/lead.ts`. Les coordonnées et les réglages visuels sont enregistrés; les images et fichiers générés ne sont pas transmis à l’API.
 - Événements de mesure : `studio_start`, `studio_tier`, `studio_submit`.
 - Lien direct vers le module : `/contact#formulaire` (à utiliser dans les publicités, QR, signatures e-mail). Sur la page Contact, le module affiche aussi « Je souhaite : un devis / une démonstration / la maquette de ma carte », et le bouton d'envoi change selon le choix.
 
@@ -281,8 +282,7 @@ Même composant que le module de la page Contact : `<CardStudio designer />`. R�
 
 - Les boutons « Découvrir l'Essentielle / la Pro / la Signature » de la section « Une carte pour chaque niveau » ouvrent le configurateur sur le bon niveau.
 - Fichiers acceptés : images (PNG, JPG, WEBP, SVG), 5 Mo maximum. L'aperçu est local (rien n'est envoyé tant que le visiteur ne valide pas).
-- Envoi : le détail du design part avec la demande (`design` : fond, logo, accent, zoom, cadrage, assombrissement). En mode API (`LEAD_ENDPOINT`), les images de moins de 1,5 Mo sont jointes en base64 (`fond_fichier`, `logo_fichier`). En mode e-mail, un message rappelle au visiteur de joindre ses fichiers.
-- À prévoir côté serveur si vous voulez recevoir les fichiers lourds : un envoi en `multipart/form-data` vers un stockage (S3, Cloudinary…).
+- Les coordonnées, le texte et la sélection de carte sont enregistrés dans la demande. Les fichiers visuels de conception ne sont pas joints au formulaire.
 - Mesure : `studio_upload` (logo / fond) en plus des événements du module.
 
 ## V2 (septembre 2026)
@@ -327,7 +327,7 @@ src/
 
 - **Vérifier les types** : `npm run typecheck` (tout le site est en TypeScript strict depuis la V6).
 - **Images** : `public/images/{contenu,immobilier,equipe}/<nom>-l.webp` (largeur pleine) et `-s.webp` (moitié). Pour remplacer un visuel, garder ces deux suffixes et les dimensions déclarées dans `data/*.ts`.
-- **Demande de devis** : un seul formulaire pour toutes les prestations, envoyé à `lead-intake` (même circuit que la page Contact). Liens directs : `?devis=video,visite-3d` (prestations pré-cochées) ou `#devis`.
+- **Demande de devis** : un seul formulaire pour toutes les prestations, envoyé à l’API Support Connecté et consultable dans « Demandes » côté admin. Liens directs : `?devis=video,visite-3d` (prestations pré-cochées) ou `#devis`.
 - **Bouton « Demander un devis » de l'en-tête** : sur les pages V5 il ouvre le formulaire (`Header` → prop `onQuote`), ailleurs il mène à `/contact`.
 - **WhatsApp** : renseigner `WHATSAPP` dans `data/conseiller.ts` (format international). Vide = les boutons proposent d'appeler le standard.
 - **Textes modifiables dans le back-office** : `contenu.hero`, `contenu.cta`, `contenu.prix`, `immobilier.hero`, `immobilier.cta`, `immobilier.prix`.

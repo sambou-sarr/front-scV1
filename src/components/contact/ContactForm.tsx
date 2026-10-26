@@ -10,13 +10,13 @@ import track from '../../utils/track';
 /*
   V6 — Formulaire de contact simple (remplace la carte qui s'écrit en direct sur cette page).
   Objet pré-sélectionné par l'adresse : /contact?sujet=devis|demo|qr|question|autre#formulaire
-  ou par l'événement « lead:preset » (cartes du hero). Envoi : utils/lead.ts → fonction lead-intake.
+  ou par l'événement « lead:preset » (cartes du hero). Envoi : utils/lead.ts → API Support Connecté.
   Consentement marketing séparé, non pré-coché, horodaté (loi n° 2008-08, art. 16). Champ piège anti-robot.
 */
 interface Coords { name: string; company: string; phone: string; email: string; message: string; prefer: string; optin: boolean; website: string }
 type TextField = 'name' | 'company' | 'phone' | 'email';
 type Errors = Partial<Record<TextField | 'reach', string>>;
-type State = 'edit' | 'sending' | 'ok' | 'mailto' | 'fail';
+type State = 'edit' | 'sending' | 'ok' | 'fail';
 
 const EMPTY: Coords = { name: '', company: '', phone: '', email: '', message: '', prefer: 'Appel', optin: false, website: '' };
 const fromUrl = (): string => {
@@ -56,13 +56,13 @@ export default function ContactForm({ id = 'formulaire' }: { id?: string }) {
       intent: S.intent, intentLabel: S.label, products: S.products, sector: '',
       name: d.name.trim(), company: d.company.trim(), phone: d.phone.trim(), email: d.email.trim(), city: '', prefer: d.prefer,
       message: d.message.trim(),
-      consent_marketing: d.optin, consent_text: d.optin ? STUDIO.optin : '', consent_at: now,
+      consent_marketing: d.optin, consent_text: d.optin ? STUDIO.optin : '', consent_at: d.optin ? now : undefined,
       source: 'site', page: window.location.pathname, website: d.website,
     };
     try {
       const r = await sendLead(payload);
       track('contact_submit', { subject, mode: r.mode, optin: d.optin });
-      setState(r.mode === 'mailto' ? 'mailto' : 'ok');
+      setState('ok');
     } catch { setState('fail'); }
   };
 
@@ -86,11 +86,11 @@ export default function ContactForm({ id = 'formulaire' }: { id?: string }) {
           </ul>
         </div>
 
-        {state === 'ok' || state === 'mailto' ? (
+        {state === 'ok' ? (
           <div className="cf-card cf-done" role="status">
             <span className="cf-ok"><Icon id="i-check" /></span>
             <b>{C_FORM.done.title}</b>
-            <p>{state === 'mailto' ? C_FORM.done.mailto : C_FORM.done.text}</p>
+            <p>{C_FORM.done.text}</p>
             <button type="button" className="btn btn-line dark" onClick={() => { setD(EMPTY); setState('edit'); }}>{C_FORM.done.again}</button>
           </div>
         ) : (

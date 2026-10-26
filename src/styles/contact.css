@@ -187,14 +187,15 @@
 
 /* ---------- V6 : formulaire de contact simple ---------- */
 .cf{background:#fff;padding:clamp(80px,10vw,130px) 0;border-top:1px solid var(--gris-l);scroll-margin-top:72px}
-.cf-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(32px,5vw,72px);align-items:start}
+.contact-page .cf{width:100%;max-width:none;margin:0}
+.cf-grid{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:clamp(32px,5vw,72px);align-items:start}
 .cf-p{margin:18px 0 0;color:var(--gris);max-width:44ch}
 .cf-direct{list-style:none;margin:26px 0 0;padding:0;display:grid;gap:10px}
 .cf-direct li{display:flex;align-items:center;gap:12px;font:600 15px var(--sans)}
 .cf-direct svg{width:18px;height:18px;color:var(--rouge)}
 .cf-direct a{color:var(--txt)}
-.cf-card{display:grid;gap:16px;padding:clamp(22px,3vw,34px);border-radius:22px;background:var(--ivoire);border:1px solid rgba(0,0,0,.05)}
-.cf-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cf-card{display:grid;gap:20px;width:100%;min-width:0;padding:clamp(26px,3.5vw,40px);border-radius:22px;background:var(--ivoire);border:1px solid rgba(0,0,0,.05)}
+.cf-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .cf-subj{border:0;margin:0;padding:0}
 .cf-subj legend{font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--gris);margin-bottom:10px}
 .cf-subj div{display:flex;flex-wrap:wrap;gap:8px}
@@ -207,10 +208,11 @@
 .cf-optin input{margin-top:3px;accent-color:var(--rouge)}
 .cf-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .cf-hint{margin:0;font-size:12.5px;color:var(--gris)}
-.cf-card .btn{justify-self:start}
+.cf-card .btn{justify-self:start;min-width:220px;justify-content:center}
 .cf-done{justify-items:start;text-align:left}
 .cf-done b{font:500 28px var(--serif)}
 .cf-done p{margin:0;color:#3b3d40}
 .cf-ok{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--rouge);color:#fff}
 .cf-ok svg{width:22px;height:22px}
-@media (max-width:900px){.cf-grid{grid-template-columns:1fr}.cf-fields{grid-template-columns:1fr}}
+@media (max-width:1050px){.cf-grid{grid-template-columns:1fr;gap:34px}.cf-head,.cf-card{width:min(100%,760px);justify-self:center}}
+@media (max-width:600px){.cf{padding:68px 0}.cf-card{padding:24px 18px;gap:17px}.cf-fields{grid-template-columns:1fr}.cf-card .btn{width:100%}}

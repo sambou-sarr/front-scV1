@@ -56,6 +56,7 @@ const AdminFicheDetail = lazy(
   () => import("./features/admin/pages/FicheDetail")
 );
 const AdminClients = lazy(() => import("./features/admin/pages/Clients"));
+const AdminLeads = lazy(() => import("./features/admin/pages/Leads"));
 const AdminRelances = lazy(() => import("./features/admin/pages/Relances"));
 const AdminProduction = lazy(() => import("./features/admin/pages/Production"));
 const AdminQrCodes = lazy(() => import("./features/admin/pages/QrCodes"));
@@ -191,6 +192,7 @@ export default function App() {
             <Route path="fiches" element={<AdminFiches />} />
             <Route path="fiches/:id" element={<AdminFicheDetail />} />
             <Route path="clients" element={<AdminClients />} />
+            <Route path="demandes" element={<AdminLeads />} />
             <Route path="relances" element={<AdminRelances />} />
             <Route path="production" element={<AdminProduction />} />
             <Route path="qrcodes" element={<AdminQrCodes />} />

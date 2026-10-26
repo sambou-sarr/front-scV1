@@ -1,5 +1,5 @@
 // Types partagés de la mise à jour V5 (création de contenu, immobilier, demandes de devis).
-// Le contrat LeadPayload est celui que reçoit la fonction serveur lead-intake.
+// Données collectées par les formulaires publics et enregistrées par l’API.
 
 export type Pole = 'contenu' | 'impression' | 'digital' | 'ia' | 'immobilier';
 export type Mode = 'reel' | 'ia';
@@ -36,7 +36,7 @@ export interface Projet {
   stade?: Stade;
 }
 
-/** Ce que reçoit lead-intake (champs historiques + champs V5). */
+/** Champs historiques et champs V5 envoyés ensemble à l’API. */
 export interface LeadPayload {
   intent: 'devis' | 'demo' | 'question';
   intentLabel: string;

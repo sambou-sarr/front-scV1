@@ -13,6 +13,9 @@ import Clients from "./pages/Clients";
 import Dashboard from "./pages/Dashboard";
 import FicheDetail from "./pages/FicheDetail";
 import Fiches from "./pages/Fiches";
+import Leads from "./pages/Leads";
+import Production from "./pages/Production";
+import QrCodes from "./pages/QrCodes";
 import Relances from "./pages/Relances";
 
 (
@@ -36,6 +39,11 @@ const revenus = {
   fichesParSemaine: [{ semaine: "2026-09-21", nb: 2 }],
 };
 const page = { page: 1, limit: 20, total: 1, totalPages: 1 };
+const relance = (id: number, slug: string) => ({
+  id, slug, nom: `Contact ${id}`, prenom: `Contact ${id}`, entreprise: `Entreprise ${id}`,
+  formule: "pro", dateEcheance: "2027-01-15", joursRestants: 80, scansTotal: id,
+  telephone: null, whatsapp: null, email: null, proprietaire: null,
+});
 
 let calls: { url?: string; params?: Record<string, unknown> }[] = [];
 const original = api.defaults.adapter;
@@ -52,7 +60,36 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
       abonnements: [] };
   if (url === "/admin/users")
     return { users: [{ id: 9, email: "awa@sc.sn", nom: "Awa", role: "client", emailVerifie: true, createdAt: "2026-01-01T00:00:00Z", nbFiches: 2 }], pagination: page };
-  if (url === "/admin/relances") return { total: 0, items: [] };
+  if (url === "/admin/leads") return {
+    items: [{
+      id: 42, intent: "devis", intentLabel: "Devis — Création de contenu",
+      products: ["Vidéo de présentation"], sector: "restaurant", name: "Awa Ndiaye",
+      role: null, company: "Chez Awa", phone: "+221771234567", email: "awa@example.sn",
+      city: "Saly", prefer: "WhatsApp", message: "Je souhaite un devis vidéo.",
+      consentMarketing: false, consentText: null, consentAt: "2026-10-26T16:00:00.000Z",
+      source: "site", page: "/contact", pole: "contenu", services: ["video"],
+      production: "reel", delai: "mois", profil: null, projet: null, design: null,
+      status: "NEW", createdAt: "2026-10-26T16:00:00.000Z", updatedAt: "2026-10-26T16:00:00.000Z",
+    }],
+    pagination: page,
+  };
+  if (url === "/admin/leads/42") return { lead: { id: 42, status: "CONTACTED" } };
+  if (url === "/admin/production/summary")
+    return { cartesAImprimer: 0, stickersAParametrer: { fonction: 0, telephone: 0 }, qrSansCible: 1, scansQr: 0 };
+  if (url === "/admin/production/cartes") return { cartes: [] };
+  if (url === "/admin/production/stickers") return { stickers: [] };
+  if (url === "/admin/production/qr") return { qr: [{
+    code: "qr-code-1", url: "https://sc.example/q/qr-code-1", label: "Menu du restaurant",
+    targetUrl: null, actif: true, scans: 0, lastScanAt: null, sticker: null,
+  }] };
+  if (url === "/admin/qrcodes/styles") return { styles: [] };
+  if (url === "/admin/relances") {
+    const type = (c.params as Record<string, string> | undefined)?.type;
+    const items = type === "bientot" ? [relance(21, "renouvellement"), relance(24, "mixte")]
+      : type === "expirees" ? [relance(22, "expiree")]
+      : [relance(23, "montee"), relance(24, "mixte")];
+    return { total: items.length, items };
+  }
   throw new Error(`route non simulée : ${url}`);
 };
 
@@ -97,6 +134,9 @@ const app = (path: string) => (
         <Route path="fiches" element={<Fiches />} />
         <Route path="fiches/:id" element={<FicheDetail />} />
         <Route path="clients" element={<Clients />} />
+        <Route path="demandes" element={<Leads />} />
+        <Route path="production" element={<Production />} />
+        <Route path="qrcodes" element={<QrCodes />} />
         <Route path="relances" element={<Relances />} />
         <Route path="*" element={<AdminNotFound />} />
       </Route>
@@ -118,7 +158,7 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Root");
     expect(host.textContent).toContain("Encaissé ce mois");
     expect(host.textContent).toMatch(/50\s000\sF/); // espace (insécable) du format fr-FR
-    for (const l of ["Fiches", "Clients", "Relances", "Production", "QR codes", "Formules"])
+    for (const l of ["Fiches", "Clients", "Demandes", "Relances", "Production", "QR codes", "Formules"])
       expect(byText("aside nav a", l), l).toBeTruthy();
     expect(byText("aside nav a", "Formules")?.getAttribute("href")).toBe("/admin/formules");
   });
@@ -170,6 +210,18 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Fiches d’un client");
   });
 
+  it("l’administration affiche les demandes de contact et leurs coordonnées", async () => {
+    act(() => root.render(app("/admin/demandes")));
+    await settle();
+    expect(host.textContent).toContain("Demandes");
+    expect(host.textContent).toContain("Awa Ndiaye");
+    expect(host.textContent).toContain("Vidéo de présentation");
+    expect(host.textContent).toContain("+221771234567");
+    expect(host.querySelector('select[aria-label="Statut de la demande 42"]')).toBeTruthy();
+    click(byText("summary", "Voir le message"));
+    expect(host.textContent).toContain("Je souhaite un devis vidéo.");
+  });
+
   it("un identifiant de fiche invalide ou une adresse inconnue donnent « Page introuvable » dans le cadre", async () => {
     act(() => root.render(app("/admin/fiches/abc")));
     await settle();
@@ -180,9 +232,32 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Page introuvable");
   });
 
-  it("la page Relances s'affiche sans erreur", async () => {
+  it("affiche toutes les relances par défaut sans doublonner les fiches", async () => {
     act(() => root.render(app("/admin/relances")));
     await settle();
-    expect(host.textContent).toContain("Rien à relancer");
+    expect(host.textContent).toContain("Toutes (4)");
+    expect(host.textContent).toContain("renouvellement");
+    expect(host.textContent).toContain("expiree");
+    expect(host.textContent).toContain("montee");
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(4);
+    expect(host.querySelector(".adm-chip.on")?.textContent).toContain("Toutes");
+    expect(calls.filter((c) => c.url === "/admin/relances")).toHaveLength(3);
+    click(byText("button.adm-chip", "Expirées"));
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(host.textContent).toContain("Entreprise 22");
+  });
+
+  it("ouvre les QR codes depuis la production avec le lien dynamique prérempli", async () => {
+    act(() => root.render(app("/admin/production")));
+    await settle();
+    click(byText("button[role=tab]", "QR dynamiques"));
+    expect(host.textContent).toContain("Menu du restaurant");
+
+    click(byText("a", "Générer un QR code"));
+    await settle();
+
+    expect(where()).toContain("/admin/qrcodes?url=");
+    expect(host.querySelector<HTMLInputElement>('input[type="url"]')?.value).toBe("https://sc.example/q/qr-code-1");
+    expect(host.querySelector<HTMLInputElement>('input[placeholder="flyer-salon"]')?.value).toBe("Menu du restaurant");
   });
 });

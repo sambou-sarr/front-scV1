@@ -81,6 +81,42 @@ export interface UsersPage {
   pagination: Pagination;
 }
 
+export type LeadStatus = "NEW" | "CONTACTED" | "CLOSED";
+export interface LeadRequest {
+  id: number;
+  intent: string;
+  intentLabel: string;
+  products: string[];
+  sector: string | null;
+  name: string;
+  role: string | null;
+  company: string | null;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  prefer: string | null;
+  message: string | null;
+  consentMarketing: boolean;
+  consentText: string | null;
+  consentAt: string | null;
+  source: string;
+  page: string | null;
+  pole: string | null;
+  services: string[];
+  production: string | null;
+  delai: string | null;
+  profil: string | null;
+  projet: Record<string, unknown> | null;
+  design: Record<string, unknown> | null;
+  status: LeadStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface LeadRequestsPage {
+  items: LeadRequest[];
+  pagination: Pagination;
+}
+
 export interface ListFichesParams {
   search?: string;
   statut?: string;

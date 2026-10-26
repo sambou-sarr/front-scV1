@@ -1,5 +1,5 @@
 // Formulaire de devis V5 — deux étapes (le projet, puis les coordonnées), en fenêtre par-dessus la page.
-// Envoi : utils/lead.ts → fonction lead-intake (même circuit que la page Contact).
+// Envoi : utils/lead.ts → API Support Connecté (même circuit que la page Contact).
 // Ouverture : quote.open({...}) depuis un bouton, lien « ?devis=video,visite-3d » ou ancre « #devis ».
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -21,7 +21,7 @@ const PREFS = ['WhatsApp', 'Appel', 'E-mail'];
 const POLE_ORDER: Pole[] = ['contenu', 'digital', 'impression', 'ia', 'immobilier'];
 const SECTOR_LIST = SECTORS as { id: string; name: string }[];
 
-type Step = 'projet' | 'contact' | 'envoi' | 'ok' | 'mailto' | 'erreur';
+type Step = 'projet' | 'contact' | 'envoi' | 'ok' | 'erreur';
 interface Coords { name: string; phone: string; email: string; company: string; city: string; sector: string; message: string; prefer: string; optin: boolean; website: string }
 const EMPTY: Coords = { name: '', phone: '', email: '', company: '', city: '', sector: '', message: '', prefer: 'WhatsApp', optin: false, website: '' };
 
@@ -87,7 +87,7 @@ export default function QuoteForm() {
   const set = <K extends keyof Coords>(k: K, v: Coords[K]) => setD((x) => ({ ...x, [k]: v }));
   const okContact = d.name.trim().length > 1 && (d.phone.replace(/\D/g, '').length >= 9 || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim()));
   const labels = selected.map((id) => PRESTA[id]?.label ?? id);
-  const asked = (step === 'ok' || step === 'mailto' ? sent : labels).slice(0, 3).join(', ');
+  const asked = (step === 'ok' ? sent : labels).slice(0, 3).join(', ');
   const cons = conseiller(`Bonjour Support Connecté, ${asked ? `je souhaite un devis : ${asked}.` : 'je souhaite un devis.'}`);
 
   const toStep2 = () => { setStep('contact'); track('quote_step', { step: 2, pole, n: selected.length }); };
@@ -121,7 +121,7 @@ export default function QuoteForm() {
       track('quote_submit', { pole, n: selected.length, profil: profil || '', production: payload.production, delai: payload.delai, mode: r.mode });
       setSent(labels);
       quote.done();
-      setStep(r.mode === 'mailto' ? 'mailto' : 'ok');
+      setStep('ok');
     } catch {
       track('quote_error', { pole });
       setStep('erreur');
@@ -212,10 +212,10 @@ export default function QuoteForm() {
           </form>
         )}
 
-        {(step === 'ok' || step === 'mailto') && (
+        {step === 'ok' && (
           <div className="qf-b qf-done">
             <span className="qf-ok" aria-hidden="true"><Icon id="i-check" /></span>
-            <p>{step === 'mailto' ? 'Votre messagerie s’est ouverte avec la demande pré-remplie : il ne reste qu’à l’envoyer.' : 'Merci, votre demande est bien arrivée. Devis chiffré et détaillé, sans engagement.'}</p>
+            <p>Merci, votre demande est bien arrivée. Devis chiffré et détaillé, sans engagement.</p>
             <p className="qf-hint">Un conseiller vous recontacte {d.prefer === 'E-mail' ? 'par e-mail' : d.prefer === 'Appel' ? 'par téléphone' : 'sur WhatsApp'}.</p>
             <div className="qf-act">
               <a className="btn btn-line dark" href={cons.href} {...(cons.external ? { target: '_blank', rel: 'noreferrer' } : {})}><Icon id={cons.icon} />{cons.label}</a>

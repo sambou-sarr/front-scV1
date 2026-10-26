@@ -151,7 +151,11 @@ function QrRow({ q, onSave }: { q: QrLien; onSave: (b: { targetUrl?: string | nu
   const inchange = t === (q.targetUrl ?? ''), invalide = !!t && !/^https?:\/\//i.test(t);
   return (
     <tr className={q.actif ? '' : 'off'}>
-      <td data-l="Code"><code className="nfc">{q.url.replace('https://', '')}</code></td>
+      <td data-l="Code"><code className="nfc">{q.url.replace('https://', '')}</code>
+        <Link className="adm-btn adm-btn-ghost" to={`/admin/qrcodes?${new URLSearchParams({ url: q.url, nom: q.label || q.code })}`}>
+          <Icon n="qr" s={16} />Générer un QR code
+        </Link>
+      </td>
       <td data-l="Sticker"><b>{q.label || '—'}</b>{q.sticker && <small>{q.sticker.tailleMm / 10} cm</small>}</td>
       <td data-l="Cible"><div className="row-a left"><input value={v} placeholder="https://… (à régler)" onChange={(e) => setV(e.target.value)} aria-invalid={invalide} />
         <Btn kind="red" disabled={inchange || invalide} onClick={() => onSave({ targetUrl: t || null }, t ? 'Cible enregistrée : le sticker ouvre la nouvelle adresse' : 'Cible retirée')}>Enregistrer</Btn></div>
