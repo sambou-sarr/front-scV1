@@ -25,6 +25,27 @@ lib/fichePayload.ts       Brouillon → corps du PATCH (n'envoie que les différ
 lib/ficheSource.ts        Source de données de l'éditeur (API : GET / PATCH fiches/:id)
 ```
 
+## Renouvellement d'abonnement (fiche arrivée à terme)
+
+Quand l'abonnement d'une fiche est échu, le serveur la traite comme **Essentielle** (affichage réduit, modification
+bloquée : `expiree: true`, `ABONNEMENT_EXPIRE`). Le renouvellement redonne une formule payante.
+
+- **Côté serveur, il n'existe pas de route « renouveler »** : on utilise `POST /subscription/upgrade` (puis la
+  confirmation du paiement). Une fiche sans abonnement valide étant vue comme Essentielle, toute formule payante est
+  acceptée, **y compris la même que celle qui vient de se terminer**. Tant que l'abonnement est valide, seule une
+  formule supérieure est acceptée (pas de renouvellement anticipé).
+- `lib/renewal.ts` (logique pure) : `renewalInfo(fiche)` → `{ expired, previousPlan, endedAt }`, `renewPath(id)`.
+  La formule précédente vient de `latestSubscription.plan.type` (renvoyée par `GET client/dashboard/fiches`).
+- `PaymentModal` passe en mode renouvellement pour une fiche échue : titre, formule précédente présélectionnée, toutes
+  les formules payantes proposées, bouton « Renouveler », puis rafraîchissement du tableau de bord, de l'éditeur
+  (`fiche-preview`) et de la page publique.
+- Points d'entrée : tableau de bord (alerte et ligne de fiche), page des abonnements (bouton « Renouveler »), message
+  de blocage de l'éditeur. Tous ouvrent `/espace-client/abonnements?renew=<id>` ; la fenêtre s'ouvre toute seule et le
+  paramètre est retiré à la fermeture.
+- **Production** : le paiement réel (Wave / Orange Money) n'est pas branché côté serveur ; seul l'adaptateur de
+  simulation existe (désactivé en production). Le renouvellement ne sera utilisable en production qu'avec un
+  fournisseur de paiement.
+
 ## Outils du propriétaire (QR et « NFC · QR »)
 
 Le QR code, le bouton « NFC · QR » et le geste « tirer pour le QR » servent au **propriétaire** pour qu'une personne

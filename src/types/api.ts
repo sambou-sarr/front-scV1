@@ -90,6 +90,8 @@ export interface ApiFicheSummary {
   latestSubscription?: {
     endsAt: string | null;
     status: "ACTIVE" | "CANCELED" | "EXPIRED";
+    /** Formule de ce dernier abonnement (permet de proposer son renouvellement). */
+    plan?: { type: PlanType };
   } | null;
   /** Ancien format compatible avec les réponses déjà adaptées. */
   abonnementActif?: {

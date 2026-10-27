@@ -10,7 +10,9 @@ import {
   quoteSubscription,
   upgradeFichePlan,
 } from "../../espaceClient.service";
-import { getPlan, subscriptionDurationLabel } from "./PlansPanel";
+import { fmtDate } from "../../lib/dashboard";
+import { renewalInfo } from "../../lib/renewal";
+import { getPlan, planLabel, subscriptionDurationLabel } from "./PlansPanel";
 
 const PLAN_RANK: Record<string, number> = {
   ESSENTIELLE: 0,
@@ -28,7 +30,12 @@ export function PaymentModal({
   onClose: () => void;
   onSuccess?: () => void;
 }) {
-  const currentPlan = (getPlan(fiche) ?? "ESSENTIELLE").toUpperCase();
+  // Abonnement échu : la fiche n'a plus de formule en cours (le serveur la traite comme Essentielle) → renouvellement.
+  const renewal = renewalInfo(fiche);
+  const isRenewal = renewal.expired;
+  const currentPlan = isRenewal
+    ? "ESSENTIELLE"
+    : (getPlan(fiche) ?? "ESSENTIELLE").toUpperCase();
   const currentRank = PLAN_RANK[currentPlan] ?? 0;
   const queryClient = useQueryClient();
   const { data: pricing, isError: pricingError } = useQuery({
@@ -43,7 +50,11 @@ export function PaymentModal({
       ),
   );
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(
-    currentPlan === "PRO" ? "SIGNATURE" : "PRO"
+    isRenewal && renewal.previousPlan
+      ? renewal.previousPlan
+      : currentPlan === "PRO"
+        ? "SIGNATURE"
+        : "PRO"
   );
   const [duration, setDuration] = useState(12);
   const [notice, setNotice] = useState("");
@@ -98,10 +109,17 @@ export function PaymentModal({
       return upgradeFichePlan(fiche.id, paidPlan, selectedDuration);
     },
     onSuccess: () => {
-      setNotice("Upgrade confirmé en mode simulation. La nouvelle formule est maintenant active.");
+      setNotice(
+        isRenewal
+          ? "Abonnement renouvelé (mode simulation). Votre fiche est de nouveau modifiable et en ligne avec toutes les fonctionnalités de sa formule."
+          : "Upgrade confirmé en mode simulation. La nouvelle formule est maintenant active."
+      );
       void queryClient.invalidateQueries({
         queryKey: ["client", "dashboard", "fiches"],
       });
+      // La fiche n'est plus « expirée » : l'éditeur et la page publique ne doivent pas garder l'ancienne version en cache.
+      void queryClient.invalidateQueries({ queryKey: ["fiche-preview", fiche.id] });
+      void queryClient.invalidateQueries({ queryKey: ["public-fiche", fiche.slug] });
       onSuccess?.();
     },
     onError: (error: unknown) => {
@@ -134,13 +152,17 @@ export function PaymentModal({
               id="payment-title"
               className="mt-1 text-xl font-semibold tracking-tight text-[#08090A]"
             >
-              Choisir une formule
+              {isRenewal ? "Renouveler l’abonnement" : "Choisir une formule"}
             </h2>
             <p className="mt-1 text-sm text-[#6d665d]">
               Fiche de {fiche.prenom} {fiche.nom}
             </p>
             <p className="mt-1 text-xs text-[#6d665d]">
-              Formule actuelle : {currentPlan === "ESSENTIELLE" ? "Essentielle" : currentPlan === "PRO" ? "Pro" : "Signature"}
+              {isRenewal
+                ? renewal.endedAt
+                  ? `${renewal.previousPlan ? `Abonnement ${planLabel(renewal.previousPlan)}` : "Abonnement"} terminé le ${fmtDate(renewal.endedAt)}`
+                  : "Aucun abonnement en cours"
+                : `Formule actuelle : ${currentPlan === "ESSENTIELLE" ? "Essentielle" : currentPlan === "PRO" ? "Pro" : "Signature"}`}
             </p>
           </div>
           <button
@@ -156,7 +178,9 @@ export function PaymentModal({
           {availablePlans.length > 0 ? (
             <fieldset>
               <legend className="mb-3 text-sm font-semibold text-[#111111]">
-                Choisissez la formule supérieure
+                {isRenewal
+                  ? "Reprenez votre formule ou changez-en"
+                  : "Choisissez la formule supérieure"}
               </legend>
               <div className="grid gap-3 sm:grid-cols-2">
                 {availablePlans.map(item => {
@@ -330,17 +354,23 @@ export function PaymentModal({
             className="w-full rounded-xl bg-[#08090A] px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:bg-[#c9142b] focus:outline-none focus:ring-2 focus:ring-[#EF1733] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {upgradeMutation.isPending
-              ? "Activation en cours…"
+              ? isRenewal
+                ? "Renouvellement en cours…"
+                : "Activation en cours…"
               : upgradeMutation.isSuccess
-                ? "Formule activée"
+                ? isRenewal
+                  ? "Abonnement renouvelé"
+                  : "Formule activée"
                 : quoteQuery.data
-                  ? `Confirmer l’upgrade · ${formatPrice(quoteQuery.data.totalFcfa)}`
-                  : "Confirmer l’upgrade simulé"}
+                  ? `${isRenewal ? "Renouveler" : "Confirmer l’upgrade"} · ${formatPrice(quoteQuery.data.totalFcfa)}`
+                  : isRenewal
+                    ? "Renouveler (simulation)"
+                    : "Confirmer l’upgrade simulé"}
           </button>
           <p className="text-center text-xs leading-5 text-[#8d8a85]">
             Pour cette fiche, le tarif tient compte de la durée et des remises
             configurées. Les remises de quantité concernent les commandes
-            groupées. La formule sera activée après confirmation du serveur.
+            groupées. {isRenewal ? "Vos contenus sont conservés : la fiche repasse en ligne avec la formule choisie" : "La formule sera activée"} après confirmation du serveur.
           </p>
         </div>
       </section>

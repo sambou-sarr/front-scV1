@@ -9,6 +9,7 @@ import {
   useDashboardFiches,
 } from "../hooks/useDashboardFiches";
 import type { Health } from "../lib/dashboard";
+import { renewPath } from "../lib/renewal";
 import {
   checks,
   completion,
@@ -214,7 +215,11 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             <li key={f.id} className={PILL[health(f)].cls}>
               <b>{displayName(f)}</b> —{" "} 
               {PILL[health(f)].text(daysLeft(subscriptionEndsAt(f)))}.{" "}
-              <Link to="abonnement">Voir</Link>
+              {health(f) === "expired" ? (
+                <Link to={renewPath(f.id)}>Renouveler</Link>
+              ) : (
+                <Link to="/espace-client/abonnements">Voir</Link>
+              )}
             </li>
           ))}
 
@@ -313,6 +318,11 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                       </span>
                       <span className="db-act">
                         <button onClick={() => onView(f.slug)}>Voir</button>
+                        {h === "expired" && (
+                          <Link className="db-public-link" to={renewPath(f.id)}>
+                            Renouveler
+                          </Link>
+                        )}
                         {h !== "draft" && (
                           <a
                             className="db-public-link"

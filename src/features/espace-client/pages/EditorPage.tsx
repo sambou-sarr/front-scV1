@@ -7,6 +7,7 @@ import { resolveStickerSection, sectionTitle } from "../lib/stickerSections";
 import { useDashboardFiches } from "../hooks/useDashboardFiches";
 import { useFicheEditor } from "../hooks/useFicheEditor";
 import { useUnsavedGuard } from "../hooks/useUnsavedGuard";
+import { renewPath } from "../lib/renewal";
 import type { FicheRecord } from "../../../types";
 
 /*
@@ -172,6 +173,12 @@ function FicheEditor({ id }: { id: string }) {
           {locked && (
             <p className="edp-note edp-warn" role="alert">
               {locked}
+              {draft.expiree && draft.statut !== "suspendue" && (
+                <>
+                  {" "}
+                  <Link to={renewPath(draft.id)}>Renouveler l’abonnement</Link>
+                </>
+              )}
             </p>
           )}
           {saveError && (

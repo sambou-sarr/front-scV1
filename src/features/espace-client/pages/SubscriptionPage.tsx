@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { ApiFicheSummary } from "../../../types";
 import { StatCard } from "../components/StatCard";
 import { CardRequestPanel } from "../components/CardRequestPanel";
@@ -16,6 +17,7 @@ import {
   PlansPanel,
 } from "../components/subscription/PlansPanel";
 import { getDashboardFiche, getKpi } from "../espaceClient.service";
+import { renewalInfo } from "../lib/renewal";
 import {
   DEFAULT_FICHE_LIST_FILTERS,
   filterFiches,
@@ -91,6 +93,22 @@ function SubscriptionExpiry({ fiche }: { fiche: ApiFicheSummary }) {
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
   const [paymentFiche, setPaymentFiche] = useState<ApiFicheSummary | null>(null);
+  // /abonnements?renew=<id> : ouvre directement la fenêtre de renouvellement de cette fiche (liens du tableau de bord et de l'éditeur).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const renewId = Number(searchParams.get("renew")) || null;
+  const renewHandled = useRef(false);
+  const clearRenewParam = () =>
+    setSearchParams(
+      params => {
+        params.delete("renew");
+        return params;
+      },
+      { replace: true },
+    );
+  const closePayment = () => {
+    setPaymentFiche(null);
+    if (searchParams.has("renew")) clearRenewParam();
+  };
   const [cardFiche, setCardFiche] = useState<ApiFicheSummary | null>(null);
   const [showPlans, setShowPlans] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FICHE_LIST_FILTERS);
@@ -115,6 +133,15 @@ export default function SubscriptionPage() {
     queryKey: ["ficheSubscriptionPage"],
     queryFn: ({ signal }) => getDashboardFiche(signal),
   });
+
+  useEffect(() => {
+    if (!renewId || renewHandled.current || !fiches) return;
+    renewHandled.current = true;
+    const target = fiches.find(f => f.id === renewId);
+    if (target && renewalInfo(target).expired) setPaymentFiche(target);
+    else clearRenewParam(); // fiche inconnue ou déjà renouvelée
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renewId, fiches]);
 
   const ficheCount = fiches?.length ?? 0;
   const filteredFiches = useMemo(
@@ -341,7 +368,13 @@ export default function SubscriptionPage() {
                                 onClick={() => setPaymentFiche(fiche)}
                                 className="whitespace-nowrap rounded-lg bg-[#08090A] px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#c9142b] focus:outline-none focus:ring-2 focus:ring-[#EF1733] focus:ring-offset-2"
                               >
-                                Voir formule <span aria-hidden="true">↗</span>
+                                {renewalInfo(fiche).expired ? (
+                                "Renouveler"
+                              ) : (
+                                <>
+                                  Voir formule <span aria-hidden="true">↗</span>
+                                </>
+                              )}
                               </button>
                               <button
                                 type="button"
@@ -422,7 +455,13 @@ export default function SubscriptionPage() {
                         onClick={() => setPaymentFiche(fiche)}
                         className="mt-3 w-full rounded-xl bg-[#08090A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#c9142b]"
                       >
-                        Voir formule <span aria-hidden="true">↗</span>
+                        {renewalInfo(fiche).expired ? (
+                                "Renouveler"
+                              ) : (
+                                <>
+                                  Voir formule <span aria-hidden="true">↗</span>
+                                </>
+                              )}
                       </button>
                       <button
                         type="button"
@@ -458,7 +497,7 @@ export default function SubscriptionPage() {
       {paymentFiche && (
         <PaymentModal
           fiche={paymentFiche}
-          onClose={() => setPaymentFiche(null)}
+          onClose={closePayment}
           onSuccess={() => {
             void queryClient.invalidateQueries({
               queryKey: ["ficheSubscriptionPage"],
