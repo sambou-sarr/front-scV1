@@ -146,6 +146,11 @@ describe("Tableau de bord de la fiche", () => {
     await act(async () => {
       host.querySelector<HTMLButtonElement>(".fiche-card-request-button")!.click();
     });
+    for (let i = 0; i < 6; i++) {
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+    }
 
     expect(host.querySelector('[role="dialog"]')).toBeTruthy();
     expect(host.textContent).toContain("Demande de carte — Awa Ndiaye");
