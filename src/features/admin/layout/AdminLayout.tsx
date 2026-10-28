@@ -1,11 +1,11 @@
-import { useState } from "react";
 import type { ReactNode } from "react";
+import { Suspense, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import "../../../styles/admin.css";
 import { useSession } from "../../../lib/session";
+import "../../../styles/admin.css";
 import { logout as signOut } from "../../auth/auth.service";
-import { Icon, ToastProvider } from "../components/ui";
 import type { IconName } from "../components/ui";
+import { Icon, ToastProvider } from "../components/ui";
 
 /*
   Cadre du back-office : menu latéral (tiroir sur mobile + barre d'onglets en bas) et zone de contenu (<Outlet />).
@@ -95,7 +95,15 @@ export default function AdminLayout({ children }: { children?: ReactNode }) {
           <main className="content">
             <ToastProvider>
               <div key={pathname + search} className="page-in">
-                {children ?? <Outlet />}
+                {children ?? (
+                  <Suspense
+                    fallback={
+                      <div style={{ minHeight: "60vh" }} aria-busy="true" />
+                    }
+                  >
+                    <Outlet />
+                  </Suspense>
+                )}
               </div>
             </ToastProvider>
           </main>

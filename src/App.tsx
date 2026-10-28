@@ -13,39 +13,77 @@ import { IconSprite } from "./components/Icons";
 import { SECTORS } from "./data/secteurs";
 import RequireAdmin from "./features/auth/RequireAdmin";
 import RequireAuth from "./features/auth/RequireAuth";
-import { ForgotPasswordPage } from "./features/auth/pages/ForgotPasswordPage";
-import LoginPage from "./features/auth/pages/LoginPage"; // Importez votre page de connexion
-import RegisterPage from "./features/auth/pages/RegisterPage";
-import { ResetPasswordPage } from "./features/auth/pages/ResetPasswordPage";
-import { VerifyMailPage } from "./features/auth/pages/VerifyMailPage";
-import DashboardPage from "./features/espace-client/pages/DashboardPage";
-import DraftsPage from "./features/espace-client/pages/DraftsPage";
+import HomePage from "./pages/HomePage"; // page d'entrée : import direct
+import { LEGAL_PATHS } from "./pages/LegalPage"; // à créer (voir plus bas)
 
-import ClientLayout from "./features/espace-client/layout/ClientLayout";
-import CallbackRequestsPage from "./features/espace-client/pages/CallbackRequestsPage";
-import { FichePage } from "./features/espace-client/pages/FichePage";
-import PublicFichePage from "./features/espace-client/pages/PublicFichePage";
-import StickerSectionPage from "./features/espace-client/pages/StickerSectionPage";
-import SettingsPage from "./features/espace-client/pages/SettingsPage";
-import SubscriptionPage from "./features/espace-client/pages/SubscriptionPage";
-import AProposPage from "./pages/AProposPage";
-import BrandingPage from "./pages/BrandingPage";
-import CartesPage from "./pages/CartesPage";
-import ContactPage from "./pages/ContactPage";
-import HomePage from "./pages/HomePage";
-import LegalPage, { LEGAL_PATHS } from "./pages/LegalPage";
-import PanneauxPage from "./pages/PanneauxPage";
-import QrSmartPage from "./pages/QrSmartPage";
-import SecteursPage from "./pages/SecteursPage";
-
-// Pages chargées à la demande
+/* ---------- Pages publiques ---------- */
+const AProposPage = lazy(() => import("./pages/AProposPage"));
+const BrandingPage = lazy(() => import("./pages/BrandingPage"));
+const CartesPage = lazy(() => import("./pages/CartesPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
 const ContenuPage = lazy(() => import("./pages/ContenuPage"));
 const ImmobilierPage = lazy(() => import("./pages/ImmobilierPage"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
+const PanneauxPage = lazy(() => import("./pages/PanneauxPage"));
+const QrSmartPage = lazy(() => import("./pages/QrSmartPage"));
+const SecteursPage = lazy(() => import("./pages/SecteursPage"));
+
+/* ---------- Fiches publiques ---------- */
+const PublicFichePage = lazy(
+  () => import("./features/espace-client/pages/PublicFichePage")
+);
+const StickerSectionPage = lazy(
+  () => import("./features/espace-client/pages/StickerSectionPage")
+);
+
+/* ---------- Authentification ---------- */
+const LoginPage = lazy(() => import("./features/auth/pages/LoginPage"));
+const RegisterPage = lazy(() => import("./features/auth/pages/RegisterPage"));
+const ForgotPasswordPage = lazy(() =>
+  import("./features/auth/pages/ForgotPasswordPage").then(m => ({
+    default: m.ForgotPasswordPage,
+  }))
+);
+const ResetPasswordPage = lazy(() =>
+  import("./features/auth/pages/ResetPasswordPage").then(m => ({
+    default: m.ResetPasswordPage,
+  }))
+);
+const VerifyMailPage = lazy(() =>
+  import("./features/auth/pages/VerifyMailPage").then(m => ({
+    default: m.VerifyMailPage,
+  }))
+);
+
+/* ---------- Espace client ---------- */
+const ClientLayout = lazy(
+  () => import("./features/espace-client/layout/ClientLayout")
+);
+const DashboardPage = lazy(
+  () => import("./features/espace-client/pages/DashboardPage")
+);
+const DraftsPage = lazy(
+  () => import("./features/espace-client/pages/DraftsPage")
+);
+const CallbackRequestsPage = lazy(
+  () => import("./features/espace-client/pages/CallbackRequestsPage")
+);
+const FichePage = lazy(() =>
+  import("./features/espace-client/pages/FichePage").then(m => ({
+    default: m.FichePage,
+  }))
+);
 const EditorPage = lazy(
   () => import("./features/espace-client/pages/EditorPage")
 );
+const SubscriptionPage = lazy(
+  () => import("./features/espace-client/pages/SubscriptionPage")
+);
+const SettingsPage = lazy(
+  () => import("./features/espace-client/pages/SettingsPage")
+);
 
-// Back-office (administrateurs) : chargé à la demande, il n'alourdit ni le site public ni l'espace client
+/* ---------- Back-office (administrateurs) ---------- */
 const AdminLayout = lazy(() => import("./features/admin/layout/AdminLayout"));
 const AdminLoginPage = lazy(
   () => import("./features/admin/pages/AdminLoginPage")
@@ -61,14 +99,19 @@ const AdminRelances = lazy(() => import("./features/admin/pages/Relances"));
 const AdminProduction = lazy(() => import("./features/admin/pages/Production"));
 const AdminQrCodes = lazy(() => import("./features/admin/pages/QrCodes"));
 const AdminFormules = lazy(() => import("./features/admin/pages/Formules"));
-const AdminNotFound = lazy(() => import("./features/admin/pages/AdminNotFound"));
+const AdminNotFound = lazy(
+  () => import("./features/admin/pages/AdminNotFound")
+);
 
 const SECTOR_IDS: string[] = SECTORS.map(x => x.id);
 
-// Écran d'attente pendant le chargement d'une page lazy
+// Écran d'attente plein écran (layouts et pages hors layout)
 const Wait = () => (
   <div style={{ minHeight: "100vh", background: "#08090A" }} aria-busy="true" />
 );
+
+// Attente locale à l'intérieur d'un layout (le header reste affiché)
+const PageWait = () => <div style={{ minHeight: "60vh" }} aria-busy="true" />;
 
 // Remonte en haut de page à chaque changement de route
 function ScrollToTop() {
@@ -81,13 +124,15 @@ function ScrollToTop() {
 
 /**
  * Layout pour les pages publiques :
- * Inclut le Header et le Footer autour du contenu rendu par <Outlet />.
+ * Header + contenu de la page (chargé à la demande) + Footer.
  */
 function PublicLayout() {
   return (
     <>
       <Header current="" />
-      <Outlet />
+      <Suspense fallback={<PageWait />}>
+        <Outlet />
+      </Suspense>
       {/* <Footer current="" /> */}
     </>
   );
@@ -131,8 +176,6 @@ export default function App() {
         <Routes>
           {/* Ouverture publique des fiches connectées (sans le header du site) */}
           <Route path="/f/:slug" element={<PublicFichePage />} />
-
-          
           <Route path="/s/:slug/:section" element={<StickerSectionPage />} />
 
           {/* Pages publiques */}
@@ -153,7 +196,6 @@ export default function App() {
             <Route path="/secteurs/immobilier" element={<ImmobilierPage />} />
             <Route path="/secteurs/:sector" element={<SectorRoute />} />
           </Route>
-
           {/* Pages d'authentification */}
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -161,7 +203,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* Pages espace client */}
+          {/* Espace client */}
           <Route
             path="/espace-client"
             element={
