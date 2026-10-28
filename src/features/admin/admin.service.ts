@@ -6,6 +6,7 @@ import type {
   Abonnement,
   Carte,
   CommandeInput,
+  CreateModeleCarteInput,
   CreateStickerInput,
   Emplacements,
   FicheDetail,
@@ -16,9 +17,11 @@ import type {
   LeadRequestsPage,
   LeadStatus,
   ListFichesParams,
+  ModeleCarte,
   Parametres,
   PatchEmplacements,
   PatchFormule,
+  PatchModeleCarteInput,
   ProductionSummary,
   QrApercu,
   QrFormat,
@@ -179,6 +182,15 @@ export const adminApi = {
       versoUrl?: string | null;
     },
   ) => patch<{ carte: Carte }>(`/admin/production/cartes/${id}`, b),
+  // Modèles de carte (recto / verso affichés au client dans sa demande de carte)
+  listModelesCartes: () =>
+    get<{ modeles: ModeleCarte[] }>("/admin/production/modeles-cartes"),
+  createModeleCarte: (b: CreateModeleCarteInput) =>
+    post<{ modele: ModeleCarte }>("/admin/production/modeles-cartes", b),
+  updateModeleCarte: (id: number, b: PatchModeleCarteInput) =>
+    patch<{ modele: ModeleCarte }>(`/admin/production/modeles-cartes/${id}`, b),
+  deleteModeleCarte: (id: number) =>
+    del<{ ok: true }>(`/admin/production/modeles-cartes/${id}`),
   listStickers: () => get<{ stickers: Sticker[] }>("/admin/production/stickers"),
   createSticker: (b: CreateStickerInput) =>
     post<{ sticker: Sticker }>("/admin/production/stickers", b),

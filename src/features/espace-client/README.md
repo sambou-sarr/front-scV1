@@ -46,6 +46,18 @@ bloquée : `expiree: true`, `ABONNEMENT_EXPIRE`). Le renouvellement redonne une 
   simulation existe (désactivé en production). Le renouvellement ne sera utilisable en production qu'avec un
   fournisseur de paiement.
 
+## Demande de carte : modèle défini par l'administration
+
+`CardRequestPanel` affiche la carte que l'administration a définie pour la formule (recto / verso, bascule entre les deux).
+
+- Source : `getCardRequest(ficheId)` → `{ carte, modele }`. `modele` vient de `GET /fiches/:id/card-request` : c'est le
+  modèle **actif** de la formule que le **serveur** facturera (abonnement valide, sinon Essentielle). Le libellé et le prix
+  affichés suivent donc `modele.tier` et non la formule de la fiche.
+- `modele: null` (aucun modèle défini, ou ancien serveur sans ce champ) : l'aperçu par défaut est conservé.
+- Une adresse d'image cassée affiche « Image indisponible » pour cette face, l'autre reste consultable.
+- Gestion des modèles : `/admin/cartes` (voir `admin/README.md`).
+- Non concerné : l'illustration décorative de l'onglet « Carte » de la fiche (`fiche-card-request-art`), qui reste statique.
+
 ## Outils du propriétaire (QR et « NFC · QR »)
 
 Le QR code, le bouton « NFC · QR » et le geste « tirer pour le QR » servent au **propriétaire** pour qu'une personne

@@ -4,6 +4,8 @@ import { toApiError } from "../../../lib/apiError";
 import {
   createCardRequest,
   getCardRequest,
+  type CardModelPreview,
+  type CardRequestState,
 } from "../espaceClient.service";
 
 const CARD_DETAILS: Record<string, { label: string; price: number; style: string }> = {
@@ -23,6 +25,44 @@ const CARD_DETAILS: Record<string, { label: string; price: number; style: string
     style: "from-amber-500 to-amber-950",
   },
 };
+
+/** Carte définie par l'administration : recto / verso, avec repli si une adresse d'image est cassée. */
+function CardFaces({ modele }: { modele: CardModelPreview }) {
+  const [face, setFace] = useState<"recto" | "verso">("recto");
+  const [broken, setBroken] = useState<Record<string, boolean>>({});
+  const url = face === "recto" ? modele.rectoUrl : modele.versoUrl;
+  return (
+    <div>
+      <div className="aspect-[1.586] w-full overflow-hidden rounded-2xl bg-[#f4f1ea] shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
+        {broken[url] ? (
+          <p className="grid h-full place-items-center text-xs text-[#a11225]">
+            Image indisponible
+          </p>
+        ) : (
+          <img
+            src={url}
+            alt={`Carte ${modele.nom} — ${face}`}
+            className="h-full w-full object-cover"
+            onError={() => setBroken(b => ({ ...b, [url]: true }))}
+          />
+        )}
+      </div>
+      <div className="mt-3 flex gap-2" role="group" aria-label="Face de la carte">
+        {(["recto", "verso"] as const).map(f => (
+          <button
+            key={f}
+            type="button"
+            aria-pressed={face === f}
+            onClick={() => setFace(f)}
+            className={`rounded-full border px-4 py-1.5 text-xs font-semibold ${face === f ? "border-[#08090A] bg-[#08090A] text-white" : "border-[#d9d4cb] bg-white text-[#6d665d]"}`}
+          >
+            {f === "recto" ? "Recto" : "Verso"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const STATUS_LABELS: Record<string, string> = {
   a_imprimer: "En attente de production",
@@ -59,16 +99,23 @@ export function CardRequestPanel({
         telephoneLivraison: telephone,
         ...(notes.trim() ? { notesClient: notes.trim() } : {}),
       }),
-    onSuccess: card => {
-      queryClient.setQueryData(["card-request", ficheId], card);
+    onSuccess: carte => {
+      queryClient.setQueryData<CardRequestState>(
+        ["card-request", ficheId],
+        previous => ({ modele: previous?.modele ?? null, carte }),
+      );
       setAdresse("");
       setTelephone("");
       setNotes("");
     },
   });
 
-  const card = cardQuery.data;
-  const plan = CARD_DETAILS[formula.toLowerCase()] ?? CARD_DETAILS.essentielle;
+  const card = cardQuery.data?.carte;
+  const modele = cardQuery.data?.modele ?? null;
+  // Le modèle est celui de la formule que le serveur facturera : on aligne le libellé et le prix dessus.
+  const plan =
+    CARD_DETAILS[modele?.tier ?? formula.toLowerCase()] ??
+    CARD_DETAILS.essentielle;
   const canRequest = !card || terminalStatuses.has(card.statut);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -97,6 +144,9 @@ export function CardRequestPanel({
       </header>
 
       <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.2fr)]">
+        {modele ? (
+          <CardFaces modele={modele} />
+        ) : (
         <div
           className={`relative flex min-h-40 flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${plan.style} p-5 text-white shadow-lg`}
           aria-label={`Aperçu de carte ${plan.label}`}
@@ -111,6 +161,7 @@ export function CardRequestPanel({
           <span className="absolute -right-8 -top-12 h-36 w-36 rounded-full border border-white/20" />
           <span className="absolute -right-1 -top-5 h-24 w-24 rounded-full border border-white/20" />
         </div>
+        )}
 
         <div>
           <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f5f1] px-4 py-3">
