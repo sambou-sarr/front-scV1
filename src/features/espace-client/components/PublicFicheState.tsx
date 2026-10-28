@@ -1,5 +1,6 @@
 import { isAxiosError } from "axios";
 import { Link } from "react-router-dom";
+import LoaderPreviewPage from "../../../components/LoaderPreviewPage";
 import "../pages/FicheStats.css";
 
 /** États d'une page publique de fiche : chargement, introuvable (404…) ou indisponible (410). */
@@ -13,7 +14,7 @@ export default function PublicFicheState({
   if (loading) {
     return (
       <main className="fiche-public-state" role="status">
-        Chargement de la fiche…
+        <LoaderPreviewPage />
       </main>
     );
   }

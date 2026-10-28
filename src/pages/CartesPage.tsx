@@ -12,7 +12,6 @@ import Header from "../components/Header";
 import { IconSprite } from "../components/Icons";
 import HandTrio from "../components/media/HandTrio";
 import PhotoBand from "../components/media/PhotoBand";
-import CardStudio from "../components/studio/CardStudio";
 import useReveal from "../hooks/useReveal";
 import "../styles/cartes.css";
 import "../styles/contact.css";

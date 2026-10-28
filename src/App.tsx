@@ -131,6 +131,8 @@ export default function App() {
         <Routes>
           {/* Ouverture publique des fiches connectées (sans le header du site) */}
           <Route path="/f/:slug" element={<PublicFichePage />} />
+
+          
           <Route path="/s/:slug/:section" element={<StickerSectionPage />} />
 
           {/* Pages publiques */}
