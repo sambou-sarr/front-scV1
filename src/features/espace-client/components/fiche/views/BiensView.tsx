@@ -119,7 +119,7 @@ export default function BiensView({ fiche }: { fiche: FicheRecord }) {
               className="f-btn gold"
               href={wa(
                 fiche.whatsapp,
-                `Bonjour, je suis intéressé(e) par : ${open.titre}`,
+                `Bonjour, je suis intéressé(e) par : ${open.titre}`
               )}
               target="_blank"
               rel="noreferrer"

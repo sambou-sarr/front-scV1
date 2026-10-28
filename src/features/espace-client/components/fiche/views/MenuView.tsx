@@ -7,7 +7,7 @@ import { fcfa, wa } from "../format";
 /** Onglet Menu : plats par catégorie, fiche détaillée avec photo et vidéo. */
 export default function MenuView({ fiche }: { fiche: FicheRecord }) {
   const sections = (fiche.data.menu?.sections || []).filter(x =>
-    x.plats?.some(p => p.nom),
+    x.plats?.some(p => p.nom)
   );
   const [sec, setSec] = useState(0),
     [open, setOpen] = useState<Plat | null>(null),
@@ -91,18 +91,7 @@ export default function MenuView({ fiche }: { fiche: FicheRecord }) {
               {open.prix && <strong>{fcfa(open.prix)}</strong>}
             </div>
             {open.description && <p>{open.description}</p>}
-            <a
-              className="f-btn gold"
-              href={wa(
-                fiche.whatsapp,
-                `Bonjour, je souhaite commander : ${open.nom}`,
-              )}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <I n="wa" s={16} />
-              Commander ce plat
-            </a>
+   
           </div>
         </Sheet>
       )}

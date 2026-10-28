@@ -69,7 +69,6 @@ export default function Editor({
   return (
     <div className="ed">
       <PlanBanner fiche={fiche} plan={plan} sig={sig} />
-      <QrBox fiche={fiche} />
       <StickerBox
         fiche={fiche}
         previewSection={previewSection}
