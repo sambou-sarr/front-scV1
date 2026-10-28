@@ -1,0 +1,993 @@
+From b639f0c1e4af301cb205ad3a0d2a917b3020b2f3 Mon Sep 17 00:00:00 2001
+From: Claude <claude@users.noreply.anthropic.com>
+Date: Wed, 28 Oct 2026 19:16:07 +0000
+Subject: [PATCH] =?UTF-8?q?feat(cartes):=20mod=C3=A8les=20de=20carte=20rec?=
+ =?UTF-8?q?to=20/=20verso=20g=C3=A9r=C3=A9s=20depuis=20l'espace=20admin,?=
+ =?UTF-8?q?=20affich=C3=A9s=20dans=20la=20demande=20de=20carte?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- admin : page « Modèles de cartes » (/admin/cartes) : par formule, ajouter / modifier / activer / désactiver /
+  supprimer, aperçu recto et verso, adresses https uniquement, un seul modèle actif par formule
+- client : CardRequestPanel affiche le modèle actif (bascule recto / verso, image cassée gérée) à la place de l'aperçu
+  par défaut, qui reste le repli ; libellé et prix suivent la formule du modèle (celle que le serveur facture)
+- getCardRequest renvoie { carte, modele } ; tolère un ancien serveur sans le champ modele
+- tests (17) et READMEs
+---
+ src/App.tsx                                   |   4 +
+ src/features/admin/README.md                  |  15 +-
+ src/features/admin/admin.service.ts           |  12 +
+ src/features/admin/layout/AdminLayout.tsx     |   3 +-
+ .../admin/pages/ModelesCartes.test.tsx        | 286 ++++++++++++++++++
+ src/features/admin/pages/ModelesCartes.tsx    | 147 +++++++++
+ src/features/espace-client/README.md          |  12 +
+ .../components/CardRequestPanel.test.tsx      | 169 +++++++++++
+ .../components/CardRequestPanel.tsx           |  59 +++-
+ .../espace-client/espaceClient.service.ts     |  26 +-
+ src/styles/admin.css                          |  15 +
+ src/types/admin.ts                            |  22 ++
+ 12 files changed, 758 insertions(+), 12 deletions(-)
+ create mode 100644 src/features/admin/pages/ModelesCartes.test.tsx
+ create mode 100644 src/features/admin/pages/ModelesCartes.tsx
+ create mode 100644 src/features/espace-client/components/CardRequestPanel.test.tsx
+
+diff --git a/src/App.tsx b/src/App.tsx
+index 0acd17b..0a26fbc 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -59,6 +59,9 @@ const AdminClients = lazy(() => import("./features/admin/pages/Clients"));
+ const AdminLeads = lazy(() => import("./features/admin/pages/Leads"));
+ const AdminRelances = lazy(() => import("./features/admin/pages/Relances"));
+ const AdminProduction = lazy(() => import("./features/admin/pages/Production"));
++const AdminModelesCartes = lazy(
++  () => import("./features/admin/pages/ModelesCartes")
++);
+ const AdminQrCodes = lazy(() => import("./features/admin/pages/QrCodes"));
+ const AdminFormules = lazy(() => import("./features/admin/pages/Formules"));
+ const AdminNotFound = lazy(() => import("./features/admin/pages/AdminNotFound"));
+@@ -195,6 +198,7 @@ export default function App() {
+             <Route path="demandes" element={<AdminLeads />} />
+             <Route path="relances" element={<AdminRelances />} />
+             <Route path="production" element={<AdminProduction />} />
++            <Route path="cartes" element={<AdminModelesCartes />} />
+             <Route path="qrcodes" element={<AdminQrCodes />} />
+             <Route path="formules" element={<AdminFormules />} />
+             <Route path="*" element={<AdminNotFound />} />
+diff --git a/src/features/admin/README.md b/src/features/admin/README.md
+index 18de45c..6677801 100644
+--- a/src/features/admin/README.md
++++ b/src/features/admin/README.md
+@@ -5,14 +5,14 @@ Interface d'administration, accessible sous `/admin`. Elle réutilise le socle d
+ ## Organisation
+ - `admin.service.ts` : tous les appels `/admin/*` et `/client/qrcodes/*` (`adminApi`), erreurs en `ApiError` lisible.
+ - `layout/AdminLayout.tsx` : menu, tiroir mobile, `<Outlet />`. Protégé par `features/auth/RequireAdmin.tsx`.
+-- `pages/` : AdminLoginPage, Dashboard, Fiches, FicheDetail, Clients, Relances, Production, QrCodes, Formules, AdminNotFound.
++- `pages/` : AdminLoginPage, Dashboard, Fiches, FicheDetail, Clients, Relances, Production, ModelesCartes, QrCodes, Formules, AdminNotFound.
+ - `components/` : `ui.tsx` (Btn, Modal, Toast, Icon…), FichePicker, UserPicker, ProductionModals.
+ - `hooks/useData.ts` : chargement de données (`useData`, `useDebounced`).
+ - `lib/` : format, print (planches/cartes), production, whatsapp.
+ - Types : `src/types/admin.ts` (volontairement hors de `types/index.ts`, des noms comme `Formule` y existent déjà).
+ 
+ ## Routes
+-`/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/qrcodes`, `/admin/formules`.
++`/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/cartes`, `/admin/qrcodes`, `/admin/formules`.
+ Les filtres de la liste de fiches se lisent dans l'URL : `?statut=…`, `?userId=…`.
+ Le slug se modifie uniquement avant la création du compte client associé. L'ancien bloc « Propriétaire & carte » et les actions d'attribution/transfert/retrait n'existent plus. Les codes de rattachement carte ont été supprimés faute de parcours client correspondant.
+ 
+@@ -21,3 +21,14 @@ Connexion : `adminLogin` (`features/auth/auth.service.ts`) → `POST /auth/admin
+ 
+ ## Styles
+ `src/styles/admin.css` : tout est sous `.adm` ; les classes qui existaient déjà côté site sont préfixées `adm-`. Ne pas y ajouter de règle hors `.adm`.
++
++## Modèles de cartes (`/admin/cartes`)
++
++Le recto et le verso de la carte que le client voit dans sa **demande de carte**, par formule (Essentielle, Pro,
++Signature). Un seul modèle est **actif** par formule ; activer un modèle remplace l'ancien. Sans modèle actif, le client
++garde l'aperçu par défaut. Les images sont des adresses `https://` déjà hébergées (Cloudinary…), comme les fichiers
++d'impression de la page Production : il n'y a pas de téléversement.
++
++- API : `adminApi.listModelesCartes / createModeleCarte / updateModeleCarte / deleteModeleCarte`
++  (`/admin/production/modeles-cartes`).
++- Côté client, `CardRequestPanel` lit `modele` dans `GET /fiches/:id/card-request` (voir `espace-client/README.md`).
+diff --git a/src/features/admin/admin.service.ts b/src/features/admin/admin.service.ts
+index 7bd0691..30cfab3 100644
+--- a/src/features/admin/admin.service.ts
++++ b/src/features/admin/admin.service.ts
+@@ -6,6 +6,7 @@ import type {
+   Abonnement,
+   Carte,
+   CommandeInput,
++  CreateModeleCarteInput,
+   CreateStickerInput,
+   Emplacements,
+   FicheDetail,
+@@ -16,9 +17,11 @@ import type {
+   LeadRequestsPage,
+   LeadStatus,
+   ListFichesParams,
++  ModeleCarte,
+   Parametres,
+   PatchEmplacements,
+   PatchFormule,
++  PatchModeleCarteInput,
+   ProductionSummary,
+   QrApercu,
+   QrFormat,
+@@ -179,6 +182,15 @@ export const adminApi = {
+       versoUrl?: string | null;
+     },
+   ) => patch<{ carte: Carte }>(`/admin/production/cartes/${id}`, b),
++  // Modèles de carte (recto / verso affichés au client dans sa demande de carte)
++  listModelesCartes: () =>
++    get<{ modeles: ModeleCarte[] }>("/admin/production/modeles-cartes"),
++  createModeleCarte: (b: CreateModeleCarteInput) =>
++    post<{ modele: ModeleCarte }>("/admin/production/modeles-cartes", b),
++  updateModeleCarte: (id: number, b: PatchModeleCarteInput) =>
++    patch<{ modele: ModeleCarte }>(`/admin/production/modeles-cartes/${id}`, b),
++  deleteModeleCarte: (id: number) =>
++    del<{ ok: true }>(`/admin/production/modeles-cartes/${id}`),
+   listStickers: () => get<{ stickers: Sticker[] }>("/admin/production/stickers"),
+   createSticker: (b: CreateStickerInput) =>
+     post<{ sticker: Sticker }>("/admin/production/stickers", b),
+diff --git a/src/features/admin/layout/AdminLayout.tsx b/src/features/admin/layout/AdminLayout.tsx
+index a8fed27..4768dc0 100644
+--- a/src/features/admin/layout/AdminLayout.tsx
++++ b/src/features/admin/layout/AdminLayout.tsx
+@@ -10,7 +10,7 @@ import type { IconName } from "../components/ui";
+ /*
+   Cadre du back-office : menu latéral (tiroir sur mobile + barre d'onglets en bas) et zone de contenu (<Outlet />).
+   Même principe que ClientLayout : la protection de la route est assurée par <RequireAdmin> (App.tsx).
+-  Routes enfants : index (tableau de bord), fiches, fiches/:id, clients, demandes, relances, production, qrcodes, formules.
++  Routes enfants : index (tableau de bord), fiches, fiches/:id, clients, demandes, relances, production, cartes, qrcodes, formules.
+ */
+ export const ADMIN_BASE = "/admin";
+ 
+@@ -21,6 +21,7 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
+   { to: `${ADMIN_BASE}/demandes`, label: "Demandes", icon: "file" },
+   { to: `${ADMIN_BASE}/relances`, label: "Relances", icon: "zap" },
+   { to: `${ADMIN_BASE}/production`, label: "Production", icon: "gear" },
++  { to: `${ADMIN_BASE}/cartes`, label: "Modèles de cartes", icon: "card" },
+   { to: `${ADMIN_BASE}/qrcodes`, label: "QR codes", icon: "qr" },
+   { to: `${ADMIN_BASE}/formules`, label: "Formules", icon: "sliders" },
+ ];
+diff --git a/src/features/admin/pages/ModelesCartes.test.tsx b/src/features/admin/pages/ModelesCartes.test.tsx
+new file mode 100644
+index 0000000..9d74f16
+--- /dev/null
++++ b/src/features/admin/pages/ModelesCartes.test.tsx
+@@ -0,0 +1,286 @@
++// @vitest-environment jsdom
++import { AxiosError } from "axios";
++import { act, createElement as h } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it } from "vitest";
++import { api } from "../../../lib/api";
++import type { ModeleCarte } from "../../../types/admin";
++import { ToastProvider } from "../components/ui";
++import ModelesCartes from "./ModelesCartes";
++
++(
++  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++/* Page d'administration « Modèles de cartes » : serveur simulé en mémoire (un seul modèle actif par formule). */
++const model = (over: Partial<ModeleCarte>): ModeleCarte => ({
++  id: 1,
++  tier: "pro",
++  nom: "Pro noir",
++  rectoUrl: "https://cdn.exemple.sn/p1r.png",
++  versoUrl: "https://cdn.exemple.sn/p1v.png",
++  actif: false,
++  createdAt: "2026-10-27T10:00:00Z",
++  updatedAt: "2026-10-27T10:00:00Z",
++  ...over,
++});
++
++describe("Modèles de cartes (admin)", () => {
++  const original = api.defaults.adapter;
++  let store: ModeleCarte[];
++  let calls: {
++    method?: string;
++    url?: string;
++    body?: Record<string, unknown>;
++  }[];
++  let failList = false;
++  let root: Root;
++  let host: HTMLDivElement;
++
++  beforeEach(() => {
++    failList = false;
++    calls = [];
++    store = [
++      model({ id: 1, nom: "Pro noir", actif: true }),
++      model({
++        id: 2,
++        nom: "Pro rouge",
++        rectoUrl: "https://cdn.exemple.sn/p2r.png",
++        versoUrl: "https://cdn.exemple.sn/p2v.png",
++      }),
++      model({ id: 3, tier: "signature", nom: "Signature or", actif: true }),
++    ];
++    host = document.createElement("div");
++    document.body.appendChild(host);
++    root = createRoot(host);
++    api.defaults.adapter = async config => {
++      const body = config.data ? JSON.parse(config.data) : undefined;
++      const url = (config.url ?? "").replace(/^\//, "");
++      calls.push({ method: config.method, url: config.url, body });
++      const mk = (data: unknown, status = 200) => ({
++        status,
++        data,
++        statusText: "",
++        headers: {},
++        config,
++      });
++      const id = Number(url.split("/").pop());
++      if (
++        config.method === "get" &&
++        url === "admin/production/modeles-cartes"
++      ) {
++        if (failList)
++          throw new AxiosError(
++            "fail",
++            "500",
++            config,
++            undefined,
++            mk({ error: { message: "Serveur indisponible" } }, 500),
++          );
++        return mk({ modeles: store });
++      }
++      if (config.method === "post") {
++        if (body.actif)
++          store = store.map(m =>
++            m.tier === body.tier ? { ...m, actif: false } : m,
++          );
++        const created = model({ ...body, id: 100, actif: !!body.actif });
++        store = [...store, created];
++        return mk({ modele: created }, 201);
++      }
++      if (config.method === "patch") {
++        const target = store.find(m => m.id === id)!;
++        if (body.actif)
++          store = store.map(m =>
++            m.tier === target.tier ? { ...m, actif: false } : m,
++          );
++        store = store.map(m => (m.id === id ? { ...m, ...body } : m));
++        return mk({ modele: store.find(m => m.id === id) });
++      }
++      if (config.method === "delete") {
++        store = store.filter(m => m.id !== id);
++        return mk({ ok: true });
++      }
++      return mk({});
++    };
++  });
++  afterEach(() => {
++    api.defaults.adapter = original;
++    act(() => root.unmount());
++    host.remove();
++  });
++
++  const settle = async () => {
++    for (let i = 0; i < 6; i++)
++      await act(async () => void (await new Promise(r => setTimeout(r, 0))));
++  };
++  const open = async () => {
++    await act(async () =>
++      root.render(h(ToastProvider, null, h(ModelesCartes))),
++    );
++    await settle();
++  };
++  const section = (nom: string) =>
++    document.body.querySelector<HTMLElement>(
++      `section[aria-label="Modèles ${nom}"]`,
++    )!;
++  const button = (scope: ParentNode, label: string, nth = 0) =>
++    [...scope.querySelectorAll("button")].filter(b => b.textContent === label)[
++      nth
++    ] as HTMLButtonElement;
++  const click = async (el: HTMLElement) => {
++    await act(async () => el.click());
++    await settle();
++  };
++  const type = async (el: HTMLInputElement, value: string) => {
++    await act(async () => {
++      Object.getOwnPropertyDescriptor(
++        HTMLInputElement.prototype,
++        "value",
++      )!.set!.call(el, value);
++      el.dispatchEvent(new Event("input", { bubbles: true }));
++    });
++  };
++  const dialog = () =>
++    document.body.querySelector<HTMLElement>('[role="dialog"]')!;
++  const called = (method: string, url: string) =>
++    calls.find(c => c.method === method && c.url === url);
++
++  it("affiche, par formule, le modèle actif (recto et verso) et les autres modèles", async () => {
++    await open();
++    const pro = section("Pro");
++    expect(pro.textContent).toContain("Pro noir");
++    expect(pro.textContent).toContain("Affiché aux clients");
++    expect(
++      pro.querySelector<HTMLImageElement>('img[alt="Pro noir — recto"]')?.src,
++    ).toBe("https://cdn.exemple.sn/p1r.png");
++    expect(pro.querySelector('img[alt="Pro noir — verso"]')).toBeTruthy();
++    expect(pro.textContent).toContain("Pro rouge"); // modèle non actif, listé avec « Activer »
++    expect(button(pro, "Activer")).toBeTruthy();
++  });
++
++  it("une formule sans modèle actif l'indique : le client voit l'aperçu par défaut", async () => {
++    await open();
++    expect(section("Essentielle").textContent).toContain("Aucun modèle actif");
++    expect(section("Essentielle").textContent).toContain("aperçu par défaut");
++  });
++
++  it("activer un modèle remplace l'ancien modèle actif de la formule", async () => {
++    await open();
++    await click(button(section("Pro"), "Activer"));
++    expect(called("patch", "/admin/production/modeles-cartes/2")?.body).toEqual(
++      { actif: true },
++    );
++    const pro = section("Pro");
++    // « Pro rouge » est maintenant le modèle affiché ; « Pro noir » devient un modèle à réactiver
++    expect(pro.querySelector(".mc-active")?.textContent).toContain("Pro rouge");
++    expect(pro.querySelector(".mc-others")?.textContent).toContain("Pro noir");
++  });
++
++  it("désactiver le modèle actif laisse la formule sans modèle", async () => {
++    await open();
++    await click(button(section("Signature"), "Désactiver"));
++    expect(called("patch", "/admin/production/modeles-cartes/3")?.body).toEqual(
++      { actif: false },
++    );
++    expect(section("Signature").textContent).toContain("Aucun modèle actif");
++  });
++
++  it("ajouter un modèle : refuse une adresse non sécurisée, puis envoie la formule, le nom et les deux faces", async () => {
++    await open();
++    await click(button(section("Essentielle"), "Ajouter un modèle"));
++    expect(dialog().getAttribute("aria-label")).toBe(
++      "Nouveau modèle Essentielle",
++    );
++    const [nom, recto, verso] = [
++      ...dialog().querySelectorAll<HTMLInputElement>(
++        'input:not([type="checkbox"])',
++      ),
++    ];
++    const submit = button(dialog(), "Ajouter le modèle");
++    await type(nom, "Essentielle bleu");
++    await type(recto, "http://cdn.exemple.sn/r.png");
++    await type(verso, "https://cdn.exemple.sn/v.png");
++    expect(submit.disabled).toBe(true);
++    expect(dialog().textContent).toContain("https://");
++    await type(recto, "https://cdn.exemple.sn/r.png");
++    expect(submit.disabled).toBe(false);
++    expect(dialog().querySelectorAll("img")).toHaveLength(2); // aperçu des deux faces avant d'enregistrer
++
++    await click(submit);
++    expect(called("post", "/admin/production/modeles-cartes")?.body).toEqual({
++      tier: "essentielle",
++      nom: "Essentielle bleu",
++      rectoUrl: "https://cdn.exemple.sn/r.png",
++      versoUrl: "https://cdn.exemple.sn/v.png",
++      actif: false,
++    });
++    expect(document.body.querySelector('[role="dialog"]')).toBeNull(); // modale fermée
++    expect(section("Essentielle").textContent).toContain("Essentielle bleu");
++    expect(section("Essentielle").textContent).toContain("Aucun modèle actif"); // créé inactif par défaut
++  });
++
++  it("ajouter avec « afficher dès maintenant » active le modèle", async () => {
++    await open();
++    await click(button(section("Essentielle"), "Ajouter un modèle"));
++    const [nom, recto, verso] = [
++      ...dialog().querySelectorAll<HTMLInputElement>(
++        'input:not([type="checkbox"])',
++      ),
++    ];
++    await type(nom, "Essentielle bleu");
++    await type(recto, "https://cdn.exemple.sn/r.png");
++    await type(verso, "https://cdn.exemple.sn/v.png");
++    await click(
++      dialog().querySelector<HTMLInputElement>('input[type="checkbox"]')!,
++    );
++    await click(button(dialog(), "Ajouter le modèle"));
++    expect(
++      called("post", "/admin/production/modeles-cartes")?.body,
++    ).toMatchObject({ actif: true });
++    expect(
++      section("Essentielle").querySelector(".mc-active")?.textContent,
++    ).toContain("Essentielle bleu");
++  });
++
++  it("supprimer demande une confirmation, puis retire le modèle", async () => {
++    await open();
++    await click(button(section("Signature"), "Supprimer"));
++    expect(dialog().textContent).toContain("Signature or");
++    expect(dialog().textContent).toContain("aperçu par défaut"); // c'était le modèle actif
++    expect(calls.some(c => c.method === "delete")).toBe(false); // rien n'est supprimé avant la confirmation
++    await click(button(dialog(), "Supprimer"));
++    expect(called("delete", "/admin/production/modeles-cartes/3")).toBeTruthy();
++    expect(section("Signature").textContent).not.toContain("Signature or");
++  });
++
++  it("annuler la suppression ne supprime rien", async () => {
++    await open();
++    await click(button(section("Signature"), "Supprimer"));
++    await click(button(dialog(), "Annuler"));
++    expect(calls.some(c => c.method === "delete")).toBe(false);
++    expect(section("Signature").textContent).toContain("Signature or");
++  });
++
++  it("modifier un modèle envoie le nom et les adresses", async () => {
++    await open();
++    await click(button(section("Pro"), "Modifier", 0));
++    const [nom] = [
++      ...dialog().querySelectorAll<HTMLInputElement>(
++        'input:not([type="checkbox"])',
++      ),
++    ];
++    await type(nom, "Pro noir mat");
++    await click(button(dialog(), "Enregistrer"));
++    expect(
++      called("patch", "/admin/production/modeles-cartes/1")?.body,
++    ).toMatchObject({ nom: "Pro noir mat" });
++    expect(section("Pro").textContent).toContain("Pro noir mat");
++  });
++
++  it("une erreur du serveur est affichée", async () => {
++    failList = true;
++    await open();
++    expect(host.textContent).toContain("Serveur indisponible");
++  });
++});
+diff --git a/src/features/admin/pages/ModelesCartes.tsx b/src/features/admin/pages/ModelesCartes.tsx
+new file mode 100644
+index 0000000..4479a58
+--- /dev/null
++++ b/src/features/admin/pages/ModelesCartes.tsx
+@@ -0,0 +1,147 @@
++import { useState } from 'react';
++import type { FormEvent } from 'react';
++import { adminApi } from '../admin.service';
++import { Badge, Btn, ConfirmModal, ErrorBox, Field, Loading, Modal, useAction } from '../components/ui';
++import { useData } from '../hooks/useData';
++import { FORMULES, FORMULE_TONE } from '../lib/format';
++import type { Formule, ModeleCarte } from '../../../types/admin';
++
++/*
++  Modèles de carte : le recto et le verso que le client voit quand il demande une carte physique.
++  Un seul modèle ACTIF par formule ; sans modèle actif, le client voit l'aperçu par défaut.
++  Les images sont des adresses https déjà hébergées (Cloudinary…), comme les fichiers d'impression.
++*/
++const TIERS = Object.keys(FORMULES) as Formule[];
++const isHttps = (u: string) => {
++  try { return new URL(u.trim()).protocol === 'https:'; } catch { return false; }
++};
++
++/** Une face de carte ; une adresse cassée affiche un message au lieu d'une image vide. */
++function Face({ url, label }: { url: string; label: string }) {
++  const [ko, setKo] = useState(false);
++  return (
++    <figure className="mc-face">
++      {ko ? <div className="mc-face-ko">Image introuvable</div> : <img src={url} alt={label} loading="lazy" onError={() => setKo(true)} />}
++      <figcaption>{label}</figcaption>
++    </figure>
++  );
++}
++const Faces = ({ m }: { m: Pick<ModeleCarte, 'nom' | 'rectoUrl' | 'versoUrl'> }) => (
++  <div className="mc-faces">
++    <Face key={m.rectoUrl} url={m.rectoUrl} label={`${m.nom} — recto`} />
++    <Face key={m.versoUrl} url={m.versoUrl} label={`${m.nom} — verso`} />
++  </div>
++);
++
++function ModeleModal({ tier, modele, onClose, onSaved }: { tier: Formule; modele?: ModeleCarte; onClose: () => void; onSaved: () => void }) {
++  const [nom, setNom] = useState(modele?.nom ?? '');
++  const [recto, setRecto] = useState(modele?.rectoUrl ?? '');
++  const [verso, setVerso] = useState(modele?.versoUrl ?? '');
++  const [actif, setActif] = useState(false);
++  const [busy, setBusy] = useState(false);
++  const run = useAction();
++  const erreur = !nom.trim() ? 'Donne un nom au modèle.' : !isHttps(recto) ? 'L’adresse du recto doit commencer par https://' : !isHttps(verso) ? 'L’adresse du verso doit commencer par https://' : null;
++
++  const submit = async (e: FormEvent) => {
++    e.preventDefault();
++    if (erreur) return;
++    setBusy(true);
++    const body = { nom: nom.trim(), rectoUrl: recto.trim(), versoUrl: verso.trim() };
++    const r = modele
++      ? await run(() => adminApi.updateModeleCarte(modele.id, body), 'Modèle enregistré')
++      : await run(() => adminApi.createModeleCarte({ tier, ...body, actif }), actif ? 'Modèle ajouté et activé' : 'Modèle ajouté');
++    setBusy(false);
++    if (r) { onSaved(); onClose(); }
++  };
++  return (
++    <Modal title={modele ? `Modifier « ${modele.nom} »` : `Nouveau modèle ${FORMULES[tier]}`} onClose={onClose} wide>
++      <form className="form" onSubmit={submit}>
++        <Field label="Nom du modèle" hint="Visible seulement ici (ex. « Noir mat 2026 »)"><input value={nom} onChange={(e) => setNom(e.target.value)} maxLength={80} autoFocus /></Field>
++        <Field label="Recto (adresse de l’image)"><input type="url" value={recto} onChange={(e) => setRecto(e.target.value)} placeholder="https://…" /></Field>
++        <Field label="Verso (adresse de l’image)"><input type="url" value={verso} onChange={(e) => setVerso(e.target.value)} placeholder="https://…" /></Field>
++        {isHttps(recto) && isHttps(verso) && <Faces m={{ nom: nom.trim() || 'Aperçu', rectoUrl: recto.trim(), versoUrl: verso.trim() }} />}
++        {!modele && <label className="mc-check"><input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} /> Afficher ce modèle aux clients {FORMULES[tier]} dès maintenant <span className="adm-muted">(remplace le modèle actif)</span></label>}
++        {erreur && (nom || recto || verso) && <p className="note-gold" role="alert">{erreur}</p>}
++        <div className="form-a"><Btn onClick={onClose}>Annuler</Btn><button className="adm-btn adm-btn-red" type="submit" disabled={!!erreur || busy}>{modele ? 'Enregistrer' : 'Ajouter le modèle'}</button></div>
++      </form>
++    </Modal>
++  );
++}
++
++export default function ModelesCartes() {
++  const [data, reload, err] = useData(() => adminApi.listModelesCartes());
++  const [edition, setEdition] = useState<{ tier: Formule; modele?: ModeleCarte } | null>(null);
++  const [suppression, setSuppression] = useState<ModeleCarte | null>(null);
++  const run = useAction();
++
++  if (err) return <ErrorBox message={err} onRetry={reload} />;
++  if (!data) return <Loading />;
++
++  const activer = async (m: ModeleCarte, actif: boolean) => {
++    if (await run(() => adminApi.updateModeleCarte(m.id, { actif }), actif ? `« ${m.nom} » est maintenant affiché aux clients ${FORMULES[m.tier]}` : 'Modèle désactivé')) reload();
++  };
++  const supprimer = async (m: ModeleCarte) => {
++    if (await run(() => adminApi.deleteModeleCarte(m.id), 'Modèle supprimé')) reload();
++  };
++
++  return (
++    <div className="mc">
++      <header className="page-h">
++        <h1>Modèles de cartes</h1>
++        <p className="adm-muted">Le recto et le verso que le client voit quand il demande sa carte. Un seul modèle actif par formule.</p>
++      </header>
++
++      {TIERS.map((tier) => {
++        const liste = data.modeles.filter((m) => m.tier === tier);
++        const actif = liste.find((m) => m.actif);
++        const autres = liste.filter((m) => !m.actif);
++        return (
++          <section key={tier} className="mc-tier" aria-label={`Modèles ${FORMULES[tier]}`}>
++            <div className="mc-tier-h">
++              <h2><Badge tone={FORMULE_TONE[tier]}>{FORMULES[tier]}</Badge></h2>
++              <Btn icon="plus" onClick={() => setEdition({ tier })}>Ajouter un modèle</Btn>
++            </div>
++
++            {actif ? (
++              <div className="mc-active">
++                <p><b>{actif.nom}</b> <Badge tone="green">Affiché aux clients</Badge></p>
++                <Faces m={actif} />
++                <div className="mc-a">
++                  <Btn onClick={() => setEdition({ tier, modele: actif })}>Modifier</Btn>
++                  <Btn onClick={() => void activer(actif, false)}>Désactiver</Btn>
++                  <Btn kind="red" onClick={() => setSuppression(actif)}>Supprimer</Btn>
++                </div>
++              </div>
++            ) : (
++              <p className="note-gold">Aucun modèle actif : les clients {FORMULES[tier]} voient l’aperçu par défaut.</p>
++            )}
++
++            {autres.length > 0 && (
++              <ul className="mc-others">
++                {autres.map((m) => (
++                  <li key={m.id}>
++                    <span className="mc-name">{m.nom}</span>
++                    <Faces m={m} />
++                    <span className="mc-a">
++                      <Btn kind="dark" onClick={() => void activer(m, true)}>Activer</Btn>
++                      <Btn onClick={() => setEdition({ tier, modele: m })}>Modifier</Btn>
++                      <Btn kind="red" onClick={() => setSuppression(m)}>Supprimer</Btn>
++                    </span>
++                  </li>
++                ))}
++              </ul>
++            )}
++          </section>
++        );
++      })}
++
++      {edition && <ModeleModal tier={edition.tier} modele={edition.modele} onClose={() => setEdition(null)} onSaved={reload} />}
++      {suppression && (
++        <ConfirmModal title="Supprimer ce modèle ?" confirmLabel="Supprimer" danger onConfirm={() => { const m = suppression; setSuppression(null); void supprimer(m); }} onClose={() => setSuppression(null)}>
++          « {suppression.nom} » ne sera plus proposé. Les demandes de carte déjà passées ne sont pas modifiées.
++          {suppression.actif && ` Les clients ${FORMULES[suppression.tier]} verront l’aperçu par défaut.`}
++        </ConfirmModal>
++      )}
++    </div>
++  );
++}
+diff --git a/src/features/espace-client/README.md b/src/features/espace-client/README.md
+index 40641af..0b1586d 100644
+--- a/src/features/espace-client/README.md
++++ b/src/features/espace-client/README.md
+@@ -46,6 +46,18 @@ bloquée : `expiree: true`, `ABONNEMENT_EXPIRE`). Le renouvellement redonne une
+   simulation existe (désactivé en production). Le renouvellement ne sera utilisable en production qu'avec un
+   fournisseur de paiement.
+ 
++## Demande de carte : modèle défini par l'administration
++
++`CardRequestPanel` affiche la carte que l'administration a définie pour la formule (recto / verso, bascule entre les deux).
++
++- Source : `getCardRequest(ficheId)` → `{ carte, modele }`. `modele` vient de `GET /fiches/:id/card-request` : c'est le
++  modèle **actif** de la formule que le **serveur** facturera (abonnement valide, sinon Essentielle). Le libellé et le prix
++  affichés suivent donc `modele.tier` et non la formule de la fiche.
++- `modele: null` (aucun modèle défini, ou ancien serveur sans ce champ) : l'aperçu par défaut est conservé.
++- Une adresse d'image cassée affiche « Image indisponible » pour cette face, l'autre reste consultable.
++- Gestion des modèles : `/admin/cartes` (voir `admin/README.md`).
++- Non concerné : l'illustration décorative de l'onglet « Carte » de la fiche (`fiche-card-request-art`), qui reste statique.
++
+ ## Outils du propriétaire (QR et « NFC · QR »)
+ 
+ Le QR code, le bouton « NFC · QR » et le geste « tirer pour le QR » servent au **propriétaire** pour qu'une personne
+diff --git a/src/features/espace-client/components/CardRequestPanel.test.tsx b/src/features/espace-client/components/CardRequestPanel.test.tsx
+new file mode 100644
+index 0000000..8c92510
+--- /dev/null
++++ b/src/features/espace-client/components/CardRequestPanel.test.tsx
+@@ -0,0 +1,169 @@
++// @vitest-environment jsdom
++import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
++import { act, createElement as h } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it } from "vitest";
++import { api } from "../../../lib/api";
++import { CardRequestPanel } from "./CardRequestPanel";
++
++(
++  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++/* Demande de carte : le client voit le modèle (recto / verso) défini par l'administration. */
++const modele = {
++  id: 3,
++  tier: "signature",
++  nom: "Signature or",
++  rectoUrl: "https://cdn.exemple.sn/r.png",
++  versoUrl: "https://cdn.exemple.sn/v.png",
++};
++const carte = {
++  id: 9,
++  statut: "a_imprimer",
++  tier: "signature",
++  montantFcfa: 15000,
++  adresseLivraison: "Dakar",
++  telephoneLivraison: "770000000",
++};
++
++describe("CardRequestPanel : modèle de carte", () => {
++  const original = api.defaults.adapter;
++  let payload: Record<string, unknown>;
++  let posts: Record<string, unknown>[];
++  let root: Root;
++  let host: HTMLDivElement;
++
++  beforeEach(() => {
++    payload = { carte: null, modele };
++    posts = [];
++    host = document.createElement("div");
++    document.body.appendChild(host);
++    root = createRoot(host);
++    api.defaults.adapter = async config => {
++      const mk = (data: unknown) => ({
++        status: 200,
++        data,
++        statusText: "",
++        headers: {},
++        config,
++      });
++      if (config.method === "post") {
++        posts.push(JSON.parse(config.data));
++        return mk({ carte });
++      }
++      return mk(payload);
++    };
++  });
++  afterEach(() => {
++    api.defaults.adapter = original;
++    act(() => root.unmount());
++    host.remove();
++  });
++
++  const settle = async () => {
++    for (let i = 0; i < 6; i++)
++      await act(async () => void (await new Promise(r => setTimeout(r, 0))));
++  };
++  const open = async (formula = "pro") => {
++    await act(async () =>
++      root.render(
++        h(
++          QueryClientProvider,
++          {
++            client: new QueryClient({
++              defaultOptions: { queries: { retry: false } },
++            }),
++          },
++          h(CardRequestPanel, { ficheId: 1, formula }),
++        ),
++      ),
++    );
++    await settle();
++  };
++  const img = () => host.querySelector<HTMLImageElement>("img");
++  const faceButton = (label: string) =>
++    [...host.querySelectorAll("button")].find(
++      b => b.textContent === label,
++    ) as HTMLButtonElement;
++
++  it("affiche le recto du modèle défini par l'administration, à la place de l'aperçu par défaut", async () => {
++    await open();
++    expect(img()?.src).toBe("https://cdn.exemple.sn/r.png");
++    expect(img()?.alt).toBe("Carte Signature or — recto");
++    expect(host.querySelector('[aria-label^="Aperçu de carte"]')).toBeNull();
++  });
++
++  it("le libellé et le prix suivent la formule du modèle (celle que le serveur facture), pas la prop", async () => {
++    await open("pro"); // la fiche se dit « pro », le serveur renvoie le modèle Signature
++    expect(host.textContent).toContain("Votre carte Signature");
++    expect(host.textContent).toContain("15");
++  });
++
++  it("bascule entre recto et verso", async () => {
++    await open();
++    expect(faceButton("Recto").getAttribute("aria-pressed")).toBe("true");
++    await act(async () => faceButton("Verso").click());
++    expect(img()?.src).toBe("https://cdn.exemple.sn/v.png");
++    expect(faceButton("Verso").getAttribute("aria-pressed")).toBe("true");
++    await act(async () => faceButton("Recto").click());
++    expect(img()?.src).toBe("https://cdn.exemple.sn/r.png");
++  });
++
++  it("sans modèle défini, garde l'aperçu par défaut de la formule", async () => {
++    payload = { carte: null, modele: null };
++    await open("pro");
++    expect(img()).toBeNull();
++    expect(
++      host.querySelector('[aria-label="Aperçu de carte Pro"]'),
++    ).toBeTruthy();
++  });
++
++  it("réponse d'un ancien serveur (sans champ modele) : aperçu par défaut", async () => {
++    payload = { carte: null };
++    await open("signature");
++    expect(
++      host.querySelector('[aria-label="Aperçu de carte Signature"]'),
++    ).toBeTruthy();
++  });
++
++  it("une adresse d'image cassée affiche « Image indisponible » au lieu d'un cadre vide", async () => {
++    await open();
++    await act(async () => void img()!.dispatchEvent(new Event("error")));
++    expect(host.textContent).toContain("Image indisponible");
++    expect(img()).toBeNull();
++    await act(async () => faceButton("Verso").click()); // l'autre face reste affichable
++    expect(img()?.src).toBe("https://cdn.exemple.sn/v.png");
++  });
++
++  it("après l'envoi d'une demande, le modèle reste affiché et le statut apparaît", async () => {
++    await open();
++    const set = (el: HTMLElement, v: string) => {
++      const proto =
++        el instanceof HTMLTextAreaElement
++          ? HTMLTextAreaElement.prototype
++          : HTMLInputElement.prototype;
++      Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, v);
++      el.dispatchEvent(new Event("input", { bubbles: true }));
++    };
++    await act(async () => {
++      set(host.querySelector("textarea")!, "Dakar, Plateau");
++      set(host.querySelector('input[type="tel"]')!, "770000000");
++    });
++    await act(async () =>
++      host
++        .querySelector("form")!
++        .dispatchEvent(
++          new Event("submit", { bubbles: true, cancelable: true }),
++        ),
++    );
++    await settle();
++    expect(posts).toHaveLength(1);
++    expect(posts[0]).toMatchObject({
++      adresseLivraison: "Dakar, Plateau",
++      telephoneLivraison: "770000000",
++    });
++    expect(host.textContent).toContain("En attente de production");
++    expect(img()?.src).toBe("https://cdn.exemple.sn/r.png"); // le modèle n'a pas disparu
++  });
++});
+diff --git a/src/features/espace-client/components/CardRequestPanel.tsx b/src/features/espace-client/components/CardRequestPanel.tsx
+index 5b4f352..905040a 100644
+--- a/src/features/espace-client/components/CardRequestPanel.tsx
++++ b/src/features/espace-client/components/CardRequestPanel.tsx
+@@ -4,6 +4,8 @@ import { toApiError } from "../../../lib/apiError";
+ import {
+   createCardRequest,
+   getCardRequest,
++  type CardModelPreview,
++  type CardRequestState,
+ } from "../espaceClient.service";
+ 
+ const CARD_DETAILS: Record<string, { label: string; price: number; style: string }> = {
+@@ -24,6 +26,44 @@ const CARD_DETAILS: Record<string, { label: string; price: number; style: string
+   },
+ };
+ 
++/** Carte définie par l'administration : recto / verso, avec repli si une adresse d'image est cassée. */
++function CardFaces({ modele }: { modele: CardModelPreview }) {
++  const [face, setFace] = useState<"recto" | "verso">("recto");
++  const [broken, setBroken] = useState<Record<string, boolean>>({});
++  const url = face === "recto" ? modele.rectoUrl : modele.versoUrl;
++  return (
++    <div>
++      <div className="aspect-[1.586] w-full overflow-hidden rounded-2xl bg-[#f4f1ea] shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
++        {broken[url] ? (
++          <p className="grid h-full place-items-center text-xs text-[#a11225]">
++            Image indisponible
++          </p>
++        ) : (
++          <img
++            src={url}
++            alt={`Carte ${modele.nom} — ${face}`}
++            className="h-full w-full object-cover"
++            onError={() => setBroken(b => ({ ...b, [url]: true }))}
++          />
++        )}
++      </div>
++      <div className="mt-3 flex gap-2" role="group" aria-label="Face de la carte">
++        {(["recto", "verso"] as const).map(f => (
++          <button
++            key={f}
++            type="button"
++            aria-pressed={face === f}
++            onClick={() => setFace(f)}
++            className={`rounded-full border px-4 py-1.5 text-xs font-semibold ${face === f ? "border-[#08090A] bg-[#08090A] text-white" : "border-[#d9d4cb] bg-white text-[#6d665d]"}`}
++          >
++            {f === "recto" ? "Recto" : "Verso"}
++          </button>
++        ))}
++      </div>
++    </div>
++  );
++}
++
+ const STATUS_LABELS: Record<string, string> = {
+   a_imprimer: "En attente de production",
+   imprimee: "Imprimée",
+@@ -59,16 +99,23 @@ export function CardRequestPanel({
+         telephoneLivraison: telephone,
+         ...(notes.trim() ? { notesClient: notes.trim() } : {}),
+       }),
+-    onSuccess: card => {
+-      queryClient.setQueryData(["card-request", ficheId], card);
++    onSuccess: carte => {
++      queryClient.setQueryData<CardRequestState>(
++        ["card-request", ficheId],
++        previous => ({ modele: previous?.modele ?? null, carte }),
++      );
+       setAdresse("");
+       setTelephone("");
+       setNotes("");
+     },
+   });
+ 
+-  const card = cardQuery.data;
+-  const plan = CARD_DETAILS[formula.toLowerCase()] ?? CARD_DETAILS.essentielle;
++  const card = cardQuery.data?.carte;
++  const modele = cardQuery.data?.modele ?? null;
++  // Le modèle est celui de la formule que le serveur facturera : on aligne le libellé et le prix dessus.
++  const plan =
++    CARD_DETAILS[modele?.tier ?? formula.toLowerCase()] ??
++    CARD_DETAILS.essentielle;
+   const canRequest = !card || terminalStatuses.has(card.statut);
+ 
+   const submit = (event: FormEvent<HTMLFormElement>) => {
+@@ -97,6 +144,9 @@ export function CardRequestPanel({
+       </header>
+ 
+       <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.2fr)]">
++        {modele ? (
++          <CardFaces modele={modele} />
++        ) : (
+         <div
+           className={`relative flex min-h-40 flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${plan.style} p-5 text-white shadow-lg`}
+           aria-label={`Aperçu de carte ${plan.label}`}
+@@ -111,6 +161,7 @@ export function CardRequestPanel({
+           <span className="absolute -right-8 -top-12 h-36 w-36 rounded-full border border-white/20" />
+           <span className="absolute -right-1 -top-5 h-24 w-24 rounded-full border border-white/20" />
+         </div>
++        )}
+ 
+         <div>
+           <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f5f1] px-4 py-3">
+diff --git a/src/features/espace-client/espaceClient.service.ts b/src/features/espace-client/espaceClient.service.ts
+index fb9bb79..60a6c94 100644
+--- a/src/features/espace-client/espaceClient.service.ts
++++ b/src/features/espace-client/espaceClient.service.ts
+@@ -58,11 +58,27 @@ export type CardRequestInput = {
+   notesClient?: string;
+ };
+ 
+-export async function getCardRequest(ficheId: number): Promise<CardRequest | null> {
+-  const response = await api.get<{ carte: CardRequest | null }>(
+-    `fiches/${ficheId}/card-request`,
+-  );
+-  return response.data.carte;
++/** Modèle de carte (recto / verso) défini par l'administration pour la formule de la fiche. */
++export type CardModelPreview = {
++  id: number;
++  tier: "essentielle" | "pro" | "signature";
++  nom: string;
++  rectoUrl: string;
++  versoUrl: string;
++};
++
++export type CardRequestState = {
++  carte: CardRequest | null;
++  /** null : aucun modèle défini pour cette formule, le panneau garde son aperçu par défaut. */
++  modele: CardModelPreview | null;
++};
++
++export async function getCardRequest(ficheId: number): Promise<CardRequestState> {
++  const response = await api.get<{
++    carte: CardRequest | null;
++    modele?: CardModelPreview | null;
++  }>(`fiches/${ficheId}/card-request`);
++  return { carte: response.data.carte, modele: response.data.modele ?? null };
+ }
+ 
+ export async function createCardRequest(
+diff --git a/src/styles/admin.css b/src/styles/admin.css
+index f7cfe19..0f394f6 100644
+--- a/src/styles/admin.css
++++ b/src/styles/admin.css
+@@ -315,3 +315,18 @@
+ .adm .sim-res dd{margin:0;font-weight:500}
+ .adm .sim-res .total{font-weight:700;color:var(--txt);border-top:1px solid var(--gris-l);padding-top:8px;margin-top:4px}
+ .adm .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
++
++/* Modèles de cartes (recto / verso) */
++.adm .mc-tier { margin: 0 0 28px; padding: 18px; border: 1px solid var(--line, #e3dfd8); border-radius: 14px; background: #fff; }
++.adm .mc-tier-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
++.adm .mc-tier-h h2 { margin: 0; font-size: 16px; }
++.adm .mc-faces { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 520px; }
++.adm .mc-face { margin: 0; }
++.adm .mc-face img, .adm .mc-face-ko { display: block; width: 100%; aspect-ratio: 1.586; object-fit: cover; border-radius: 10px; border: 1px solid var(--line, #e3dfd8); background: #f4f1ea; }
++.adm .mc-face-ko { display: grid; place-items: center; color: #a11225; font-size: 13px; }
++.adm .mc-face figcaption { margin-top: 4px; font-size: 12px; color: #6d665d; }
++.adm .mc-a { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
++.adm .mc-others { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 14px; }
++.adm .mc-others li { padding-top: 14px; border-top: 1px solid var(--line, #e3dfd8); }
++.adm .mc-name { display: block; font-weight: 600; margin-bottom: 6px; }
++.adm .mc-check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+diff --git a/src/types/admin.ts b/src/types/admin.ts
+index 57a3ed0..d33bb91 100644
+--- a/src/types/admin.ts
++++ b/src/types/admin.ts
+@@ -442,3 +442,25 @@ export interface QrFormatInfo {
+   extension: string;
+   description: string;
+ }
++
++/** Modèle de carte (recto / verso) défini par l'administration pour une formule : celui que voit le client dans sa demande. */
++export interface ModeleCarte {
++  id: number;
++  tier: Formule;
++  nom: string;
++  rectoUrl: string;
++  versoUrl: string;
++  /** Un seul modèle actif par formule. */
++  actif: boolean;
++  createdAt: string;
++  updatedAt: string;
++}
++export interface CreateModeleCarteInput {
++  tier: Formule;
++  nom: string;
++  rectoUrl: string;
++  versoUrl: string;
++  /** Vrai : devient le modèle affiché aux clients de cette formule (l'ancien est désactivé). */
++  actif?: boolean;
++}
++export type PatchModeleCarteInput = Partial<Pick<ModeleCarte, "nom" | "rectoUrl" | "versoUrl" | "actif">>;
+-- 
+2.43.0
+

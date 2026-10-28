@@ -104,6 +104,16 @@ export default function AdminLayout({ children }: { children?: ReactNode }) {
                     <Outlet />
                   </Suspense>
                 )}
+
+                {/* {children ?? (
+                  <Suspense
+                    fallback={
+                      <div style={{ minHeight: "60vh" }} aria-busy="true" />
+                    }
+                  >
+                    <Outlet />
+                  </Suspense>
+                )} */}
               </div>
             </ToastProvider>
           </main>

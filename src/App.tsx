@@ -196,6 +196,7 @@ export default function App() {
             <Route path="/secteurs/immobilier" element={<ImmobilierPage />} />
             <Route path="/secteurs/:sector" element={<SectorRoute />} />
           </Route>
+
           {/* Pages d'authentification */}
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />

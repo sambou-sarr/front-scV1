@@ -1,15 +1,16 @@
-import { useQueryClient } from "@tanstack/react-query";
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { isAuthFailure } from "../../../lib/apiError";
 import { clearSession } from "../../../lib/session";
 import "../../../styles/dashboard.css";
+import { deleteFiche } from "../espaceClient.service";
 import {
   dashboardFichesKey,
   useDashboardFiches,
 } from "../hooks/useDashboardFiches";
 import type { Health } from "../lib/dashboard";
-import { renewPath } from "../lib/renewal";
 import {
   checks,
   completion,
@@ -27,18 +28,19 @@ import {
   pageFiches,
   type FicheListFilters,
 } from "../lib/ficheList";
+import { renewPath } from "../lib/renewal";
 import CreateFicheForm from "../pages/CreateFicheForm";
 import { FicheListControls, FichePagination } from "./FicheListControls";
 
-/*
-  Tableau de bord de l'espace client. Données : GET client/dashboard/fiches (TanStack Query, hook useDashboardFiches).
-  La réponse fournit les abonnements, l'échéance et les données utilisées pour les indicateurs de fiche.
-*/
 interface Props {
   user: { name: string };
   onEdit: (ficheId: number) => void;
   onView: (slug: string) => void;
 }
+
+type Fiche = NonNullable<
+  ReturnType<typeof useDashboardFiches>["data"]
+>[number];
 
 const PILL: Record<
   Health,
@@ -67,6 +69,8 @@ function Skeleton() {
 }
 
 export default function Dashboard({ user, onEdit, onView }: Props) {
+  const queryClient = useQueryClient();
+
   const {
     data: fiches,
     isPending,
@@ -75,32 +79,81 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
     refetch,
     isFetching,
   } = useDashboardFiches();
+
   const [sel, setSel] = useState<string>();
-  const [copied, setCopied] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [ficheToDelete, setFicheToDelete] = useState<Fiche | null>(null);
   const [filters, setFilters] = useState(DEFAULT_FICHE_LIST_FILTERS);
   const [page, setPage] = useState(1);
+
   const filteredFiches = useMemo(
     () => filterFiches(fiches ?? [], filters),
     [fiches, filters]
   );
+
   const pageData = pageFiches(filteredFiches, page);
+
   const updateFilters = (next: FicheListFilters) => {
     setFilters(next);
     setPage(1);
   };
-  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationKey: ["deleteFiche"],
+    mutationFn: (ficheId: number) => deleteFiche(ficheId),
+
+    onSuccess: async (_result, ficheId) => {
+      setFicheToDelete(null);
+
+      // Si la fiche supprimée était sélectionnée, ne plus la sélectionner.
+      setSel(current => {
+        const deletedFiche = fiches?.find(f => f.id === ficheId);
+        return current === deletedFiche?.slug ? undefined : current;
+      });
+
+      // Actualiser les données du dashboard après la suppression.
+      await queryClient.invalidateQueries({
+        queryKey: dashboardFichesKey,
+      });
+    },
+  });
+
+  const handleDelete = (fiche: Fiche) => {
+    deleteMutation.reset();
+    setFicheToDelete(fiche);
+  };
+
+  const confirmDelete = () => {
+    if (!ficheToDelete || deleteMutation.isPending) return;
+
+    deleteMutation.mutate(ficheToDelete.id);
+  };
 
   const handleCreated = () => {
     setCreateOpen(false);
-    void queryClient.invalidateQueries({ queryKey: dashboardFichesKey });
+    void queryClient.invalidateQueries({
+      queryKey: dashboardFichesKey,
+    });
   };
+
+  // Priorité à l'abonnement le plus récent fourni par l'API.
+  // Sinon, on recherche un abonnement actif dans la liste.
+  const selectedSubscription = ficheToDelete
+    ? ficheToDelete.latestSubscription ??
+      ficheToDelete.subscriptions?.find(s => s.status === "ACTIVE") ??
+      ficheToDelete.subscriptions?.[0]
+    : undefined;
+
+  const hasActiveSubscription =
+    selectedSubscription?.status === "ACTIVE";
 
   const createDialog = createOpen ? (
     <div
       className="db-modal-backdrop"
       onMouseDown={event => {
-        if (event.target === event.currentTarget) setCreateOpen(false);
+        if (event.target === event.currentTarget) {
+          setCreateOpen(false);
+        }
       }}
     >
       <section
@@ -114,6 +167,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             <p className="db-k">Nouvelle fiche</p>
             <h2 id="db-create-title">Créer une fiche</h2>
           </div>
+
           <button
             type="button"
             className="db-create-close"
@@ -123,11 +177,12 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             ×
           </button>
         </header>
+
         <CreateFicheForm
           onCreated={handleCreated}
           onUnauthorized={() => {
             setCreateOpen(false);
-            clearSession(); // <RequireAuth> renvoie vers /login
+            clearSession();
           }}
         />
       </section>
@@ -135,19 +190,25 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
   ) : null;
 
   if (isPending) return <Skeleton />;
+
   if (isError) {
     const expired = isAuthFailure(error);
+
     return (
       <div className="db">
         <div className="db-state" role="alert">
           <h2>
-            {expired ? "Session expirée" : "Impossible de charger vos fiches"}
+            {expired
+              ? "Session expirée"
+              : "Impossible de charger vos fiches"}
           </h2>
+
           <p>
             {expired
               ? "Reconnectez-vous pour retrouver votre espace."
               : "Vérifiez votre connexion puis réessayez."}
           </p>
+
           {expired ? (
             <a className="db-copy" href="/login">
               Se connecter
@@ -165,7 +226,8 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
       </div>
     );
   }
-  if (!fiches.length)
+
+  if (!fiches.length) {
     return (
       <div className="db">
         <div className="db-state">
@@ -174,25 +236,38 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             Créez votre première fiche connectée pour commencer à la
             personnaliser.
           </p>
-          <button className="db-create-btn" onClick={() => setCreateOpen(true)}>
+
+          <button
+            className="db-create-btn"
+            onClick={() => setCreateOpen(true)}
+          >
             + Créer ma fiche
           </button>
         </div>
+
         {createDialog}
       </div>
     );
+  }
 
-  const cur = pageData.items.find(f => f.slug === sel) ?? pageData.items[0];
+  const cur =
+    pageData.items.find(f => f.slug === sel) ?? pageData.items[0];
+
   const url = cur ? publicUrl(cur.slug) : "";
   const missing = cur ? checks(cur).filter(c => !c.ok) : [];
   const pc = cur ? completion(cur) : 0;
-  const scans = fiches.reduce((s, f) => s + f.scansTotal, 0);
-  const alerts = fiches.filter(f => !["ok", "draft"].includes(health(f)));
-  const last = fiches.reduce(
-    (a, f) => (f.updatedAt > a ? f.updatedAt : a),
-    fiches[0].updatedAt
+
+  const scans = fiches.reduce((sum, fiche) => sum + fiche.scansTotal, 0);
+
+  const alerts = fiches.filter(
+    fiche => !["ok", "draft"].includes(health(fiche))
   );
 
+  const last = fiches.reduce(
+    (latest, fiche) =>
+      fiche.updatedAt > latest ? fiche.updatedAt : latest,
+    fiches[0].updatedAt
+  );
 
   return (
     <div className="db">
@@ -201,9 +276,15 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           <div>
             <p className="db-k">Espace client</p>
             <h1>Bonjour {user.name.split(" ")[0]}</h1>
-            <p className="db-sub">Voici l’état de vos fiches connectées.</p>
+            <p className="db-sub">
+              Voici l’état de vos fiches connectées.
+            </p>
           </div>
-          <button className="db-create-btn" onClick={() => setCreateOpen(true)}>
+
+          <button
+            className="db-create-btn"
+            onClick={() => setCreateOpen(true)}
+          >
             + Créer une fiche
           </button>
         </div>
@@ -211,21 +292,20 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
 
       {alerts.length > 0 && (
         <ul className="db-alerts" role="status">
-          {alerts.map(f => (
-            <li key={f.id} className={PILL[health(f)].cls}>
-              <b>{displayName(f)}</b> —{" "} 
-              {PILL[health(f)].text(daysLeft(subscriptionEndsAt(f)))}.{" "}
-              {health(f) === "expired" ? (
-                <Link to={renewPath(f.id)}>Renouveler</Link>
+          {alerts.map(fiche => (
+            <li key={fiche.id} className={PILL[health(fiche)].cls}>
+              <b>{displayName(fiche)}</b> —{" "}
+              {PILL[health(fiche)].text(
+                daysLeft(subscriptionEndsAt(fiche))
+              )}
+              .{" "}
+              {health(fiche) === "expired" ? (
+                <Link to={renewPath(fiche.id)}>Renouveler</Link>
               ) : (
                 <Link to="/espace-client/abonnements">Voir</Link>
               )}
             </li>
           ))}
-
-          {alerts.length >  0 && (
-            <p> {alerts.length} en   </p>
-          )}
         </ul>
       )}
 
@@ -237,6 +317,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             {fiches.filter(f => health(f) === "ok").length} en ligne
           </small>
         </div>
+
         <div className="db-kpi">
           <span>Passages NFC · QR</span>
           <b>{scans.toLocaleString("fr-FR")}</b>
@@ -246,6 +327,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
               : "toutes fiches confondues"}
           </small>
         </div>
+
         <div className="db-kpi">
           <span>Dernière modification</span>
           <b className="sm">{fmtDate(last)}</b>
@@ -256,89 +338,138 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
       <div className="db-grid">
         <section aria-label="Mes fiches">
           <h2>Mes fiches</h2>
-          <FicheListControls filters={filters} onChange={updateFilters} />
+
+          <FicheListControls
+            filters={filters}
+            onChange={updateFilters}
+          />
+
           {pageData.items.length === 0 ? (
             <div className="db-state">
               <p>Aucune fiche ne correspond à ces filtres.</p>
+
               <button
                 className="db-copy"
-                onClick={() => updateFilters(DEFAULT_FICHE_LIST_FILTERS)}
+                onClick={() =>
+                  updateFilters(DEFAULT_FICHE_LIST_FILTERS)
+                }
               >
                 Effacer les filtres
               </button>
             </div>
           ) : (
             <ul className="db-list">
-              {pageData.items.map(f => {
-                const h = health(f),
-                  c = completion(f);
+              {pageData.items.map(fiche => {
+                const h = health(fiche);
+                const c = completion(fiche);
+
+                const subscription =
+                  fiche.subscriptions?.[0] ??
+                  fiche.abonnementActif;
+
                 return (
-                  <li key={f.id} className={f.id === cur.id ? "on" : ""}>
+                  <li
+                    key={fiche.id}
+                    className={fiche.id === cur?.id ? "on" : ""}
+                  >
                     <button
                       className="db-pick"
-                      onClick={() => setSel(f.slug)}
-                      aria-pressed={f.id === cur.id}
+                      onClick={() => setSel(fiche.slug)}
+                      aria-pressed={fiche.id === cur?.id}
                     >
                       <span className="db-av">
-                        {f.logo ? (
-                          <img src={f.logo} alt="" />
+                        {fiche.logo ? (
+                          <img src={fiche.logo} alt="" />
                         ) : (
-                          displayName(f).charAt(0)
+                          displayName(fiche).charAt(0)
                         )}
                       </span>
+
                       <span className="db-meta">
-                        <b>{displayName(f)}</b>
-                        <small>{f.fonction}</small>
+                        <b>{displayName(fiche)}</b>
+                        <small>{fiche.fonction}</small>
                       </span>
-                      {f.secteur && (
-                        <em className="db-tag">{SECTEUR_LABEL[f.secteur]}</em>
+
+                      {fiche.secteur && (
+                        <em className="db-tag">
+                          {SECTEUR_LABEL[fiche.secteur]}
+                        </em>
                       )}
                     </button>
+
                     <div className="db-row">
                       <span className={`db-pill ${PILL[h].cls}`}>
-                        {PILL[h].text(daysLeft(subscriptionEndsAt(f)))}
+                        {PILL[h].text(
+                          daysLeft(subscriptionEndsAt(fiche))
+                        )}
                       </span>
-                      {(f.subscriptions?.[0] ?? f.abonnementActif) && (
+
+                      {subscription && (
                         <span className="db-plan">
-                          {(f.subscriptions?.[0] ?? f.abonnementActif)?.plan
-                            .nom ??
-                            (f.subscriptions?.[0] ?? f.abonnementActif)?.plan
-                              .type}
+                          {subscription.plan?.nom ??
+                            subscription.plan?.type}
                         </span>
                       )}
-                      {f.enLigneSeule &&
-                        !(f.subscriptions?.[0] ?? f.abonnementActif) && (
+
+                      {fiche.enLigneSeule &&
+                        !subscription && (
                           <span className="db-plan free">
                             Créée gratuitement
                           </span>
                         )}
+
                       <span className="db-scans">
-                        <b>{f.scansTotal}</b> passage
-                        {f.scansTotal > 1 ? "s" : ""}
+                        <b>{fiche.scansTotal}</b> passage
+                        {fiche.scansTotal > 1 ? "s" : ""}
                       </span>
+
                       <span className="db-act">
-                        <button onClick={() => onView(f.slug)}>Voir</button>
+                        <button onClick={() => onView(fiche.slug)}>
+                          Voir
+                        </button>
+
                         {h === "expired" && (
-                          <Link className="db-public-link" to={renewPath(f.id)}>
+                          <Link
+                            className="db-public-link"
+                            to={renewPath(fiche.id)}
+                          >
                             Renouveler
                           </Link>
                         )}
+
                         {h !== "draft" && (
                           <a
                             className="db-public-link"
-                            href={`/f/${encodeURIComponent(f.slug)}`}
+                            href={`/f/${encodeURIComponent(fiche.slug)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
                             Fiche publique
                           </a>
                         )}
-                        <button className="pri" onClick={() => onEdit(f.id)}>
+
+                        <button
+                          className="pri"
+                          onClick={() => onEdit(fiche.id)}
+                        >
                           Modifier
+                        </button>
+
+                        <button
+                          type="button"
+                          className="db-delete-btn"
+                          onClick={() => handleDelete(fiche)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          Supprimer
                         </button>
                       </span>
                     </div>
-                    <div className="db-comp" title={`Fiche complète à ${c} %`}>
+
+                    <div
+                      className="db-comp"
+                      title={`Fiche complète à ${c} %`}
+                    >
                       <i>
                         <u style={{ width: `${c}%` }} />
                       </i>
@@ -349,6 +480,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
               })}
             </ul>
           )}
+
           <FichePagination
             currentPage={pageData.currentPage}
             pageCount={pageData.pageCount}
@@ -357,10 +489,6 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             total={filteredFiches.length}
             onPageChange={setPage}
           />
-          {fiches.some(
-            f =>
-              f.enLigneSeule && !f.subscriptions?.length && !f.abonnementActif
-          )}
         </section>
 
         {cur && (
@@ -370,21 +498,32 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           >
             <div className="db-card">
               <h2>Compléter « {displayName(cur)} »</h2>
+
               <p className="db-sub2">
                 {pc === 100
                   ? "Votre fiche est complète, bravo."
                   : `${missing.length} élément${missing.length > 1 ? "s" : ""} à ajouter pour convaincre vos clients.`}
               </p>
+
               <ul className="db-todo">
-                {checks(cur).map(c => (
-                  <li key={c.key} className={c.ok ? "ok" : ""}>
-                    <span aria-hidden="true">{c.ok ? "✓" : ""}</span>
-                    {c.label}
+                {checks(cur).map(check => (
+                  <li
+                    key={check.key}
+                    className={check.ok ? "ok" : ""}
+                  >
+                    <span aria-hidden="true">
+                      {check.ok ? "✓" : ""}
+                    </span>
+                    {check.label}
                   </li>
                 ))}
               </ul>
+
               {pc < 100 && (
-                <button className="db-copy pri" onClick={() => onEdit(cur.id)}>
+                <button
+                  className="db-copy pri"
+                  onClick={() => onEdit(cur.id)}
+                >
                   Compléter ma fiche
                 </button>
               )}
@@ -392,7 +531,118 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           </aside>
         )}
       </div>
+
       {createDialog}
+
+      {/* Modal de confirmation de suppression */}
+      {ficheToDelete && (
+        <div
+          className="db-modal-backdrop"
+          onMouseDown={event => {
+            if (
+              event.target === event.currentTarget &&
+              !deleteMutation.isPending
+            ) {
+              setFicheToDelete(null);
+              deleteMutation.reset();
+            }
+          }}
+        >
+          <section
+            className="db-delete-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="db-delete-title"
+            aria-describedby="db-delete-description"
+          >
+            <div className="db-delete-icon" aria-hidden="true">
+              !
+            </div>
+
+            <h2 id="db-delete-title">
+              Supprimer cette fiche ?
+            </h2>
+
+            <p className="db-delete-name">
+              {displayName(ficheToDelete)}
+            </p>
+
+            {hasActiveSubscription ? (
+              <div className="db-delete-warning">
+                <strong>Attention : abonnement actif</strong>
+
+                <p id="db-delete-description">
+                  Cette fiche possède un abonnement actif
+                  {selectedSubscription?.plan?.type
+                    ? ` (${selectedSubscription.plan.type})`
+                    : ""}
+                  {selectedSubscription?.endsAt
+                    ? ` jusqu’au ${fmtDate(selectedSubscription.endsAt)}`
+                    : ""}
+                  .
+                </p>
+
+                <p>
+                  La suppression de la fiche peut affecter
+                  l’accès au service associé. Vérifiez les
+                  conséquences sur l’abonnement avant de continuer.
+                  La suppression ne garantit pas sa résiliation.
+                </p>
+              </div>
+            ) : (
+              <p id="db-delete-description">
+                Voulez-vous vraiment supprimer cette fiche ?
+                Cette action peut être définitive.
+              </p>
+            )}
+
+            {deleteMutation.isError && (
+              <div className="db-delete-error" role="alert">
+                {isAuthFailure(deleteMutation.error)
+                  ? "Votre session a expiré. Reconnectez-vous avant de réessayer."
+                  : "La suppression a échoué. Vérifiez votre connexion et réessayez."}
+
+                {isAuthFailure(deleteMutation.error) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFicheToDelete(null);
+                      clearSession();
+                    }}
+                  >
+                    Se connecter
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="db-delete-actions">
+              <button
+                type="button"
+                className="db-delete-cancel"
+                onClick={() => {
+                  setFicheToDelete(null);
+                  deleteMutation.reset();
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="db-delete-confirm"
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending
+                  ? "Suppression…"
+                  : "Confirmer la suppression"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

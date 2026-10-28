@@ -1,9 +1,8 @@
 // create fiche
 import { api } from "../../lib/api";
-import type { ApiFicheSummary } from "../../types";
 import { toApiError } from "../../lib/apiError";
+import type { ApiFicheSummary, PlanType } from "../../types";
 import type { SubscriptionKpi } from "./pages/SubscriptionPage";
-import type { PlanType } from "../../types";
 
 export async function createFiche(data: any) {
   const result = await api.post("/fiches", data);
@@ -43,7 +42,13 @@ export type CardRequest = {
   id: number;
   ficheId: number | null;
   tier: string;
-  statut: "a_imprimer" | "imprimee" | "encodee" | "testee" | "livree" | "annulee";
+  statut:
+    | "a_imprimer"
+    | "imprimee"
+    | "encodee"
+    | "testee"
+    | "livree"
+    | "annulee";
   nfcUrl: string;
   adresseLivraison: string | null;
   telephoneLivraison: string | null;
@@ -58,20 +63,22 @@ export type CardRequestInput = {
   notesClient?: string;
 };
 
-export async function getCardRequest(ficheId: number): Promise<CardRequest | null> {
+export async function getCardRequest(
+  ficheId: number
+): Promise<CardRequest | null> {
   const response = await api.get<{ carte: CardRequest | null }>(
-    `fiches/${ficheId}/card-request`,
+    `fiches/${ficheId}/card-request`
   );
   return response.data.carte;
 }
 
 export async function createCardRequest(
   ficheId: number,
-  input: CardRequestInput,
+  input: CardRequestInput
 ): Promise<CardRequest> {
   const response = await api.post<{ carte: CardRequest }>(
     `fiches/${ficheId}/card-request`,
-    input,
+    input
   );
   return response.data.carte;
 }
@@ -118,14 +125,12 @@ export async function quoteFichePurchase(
 ): Promise<FichePurchaseQuote> {
   const response = await api.post<{ quote: FichePurchaseQuote }>(
     "fiches/purchases/quote",
-    input,
+    input
   );
   return response.data.quote;
 }
 
-export async function purchaseFiches(
-  input: FichePurchaseInput,
-): Promise<{
+export async function purchaseFiches(input: FichePurchaseInput): Promise<{
   purchase: { id: number; status: "confirmed" };
   fiches: {
     id: number;
@@ -182,7 +187,7 @@ export async function purchaseFiches(
 
 export async function quoteSubscription(
   plan: Exclude<PlanType, "ESSENTIELLE">,
-  dureeMois: number,
+  dureeMois: number
 ) {
   const response = await api.post<{
     totalFcfa: number;
@@ -232,12 +237,16 @@ export async function getKpi(): Promise<SubscriptionKpi> {
   }
 }
 
-
 export type UpgradePlanResponse = {
   succes: string;
   message?: string;
   data: {
-    subscription: { id: number; ficheId: number; planId: number; status: string };
+    subscription: {
+      id: number;
+      ficheId: number;
+      planId: number;
+      status: string;
+    };
     fiche: { id: number; formule: string };
     payment: {
       id: number;
@@ -251,12 +260,14 @@ export type UpgradePlanResponse = {
 export async function upgradeFichePlan(
   ficheId: number,
   plan: Exclude<PlanType, "ESSENTIELLE">,
-  dureeMois: number,
+  dureeMois: number
 ): Promise<UpgradePlanResponse> {
   // Étape 1 : demander l'upgrade. Le backend crée un paiement PENDING,
   // sans changer la formule active.
   const request = await api.post<{
-    data: { payment: { id: number; reference: string | null; status: "pending" } };
+    data: {
+      payment: { id: number; reference: string | null; status: "pending" };
+    };
   }>("/subscription/upgrade", {
     ficheId,
     plan: plan.toLowerCase(),
@@ -270,4 +281,9 @@ export async function upgradeFichePlan(
     `/subscription/payments/${paymentId}/simulate-confirmation`
   );
   return confirmation.data;
+}
+
+export async function deleteFiche(id: number) {
+  const result = await api.delete(`/fiches/${id}`);
+  return result.data;
 }

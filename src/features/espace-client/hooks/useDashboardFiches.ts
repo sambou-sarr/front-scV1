@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getDashboardFiche } from "../espaceClient.service";
 import { isAuthFailure } from "../../../lib/apiError";
+import { getDashboardFiche } from "../espaceClient.service";
 
 export const dashboardFichesKey = ["client", "dashboard", "fiches"] as const;
 
