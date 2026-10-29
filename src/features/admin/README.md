@@ -26,9 +26,11 @@ Connexion : `adminLogin` (`features/auth/auth.service.ts`) → `POST /auth/admin
 
 Le recto et le verso de la carte que le client voit dans sa **demande de carte**, par formule (Essentielle, Pro,
 Signature). Un seul modèle est **actif** par formule ; activer un modèle remplace l'ancien. Sans modèle actif, le client
-garde l'aperçu par défaut. Les images sont des adresses `https://` déjà hébergées (Cloudinary…), comme les fichiers
-d'impression de la page Production : il n'y a pas de téléversement.
+garde l'aperçu par défaut. Les images se **téléversent** depuis la fenêtre d'ajout (JPEG, PNG ou WebP, 12 Mo max) : le serveur
+les optimise (WebP) et les héberge ; rien à coller. Les envois ont lieu à la validation, avant la création : si l'un échoue,
+rien n'est créé. En modification, on peut ne changer que le nom ou qu'une seule face. Les anciens modèles créés avec un
+lien https restent affichés et peuvent être remplacés par un fichier.
 
 - API : `adminApi.listModelesCartes / createModeleCarte / updateModeleCarte / deleteModeleCarte`
-  (`/admin/production/modeles-cartes`).
+  (`/admin/production/modeles-cartes`) ; `uploadCardImage(file)` envoie le fichier en binaire (`/images`) et renvoie son adresse.
 - Côté client, `CardRequestPanel` lit `modele` dans `GET /fiches/:id/card-request` (voir `espace-client/README.md`).

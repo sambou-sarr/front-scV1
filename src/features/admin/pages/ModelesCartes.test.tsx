@@ -34,12 +34,18 @@ describe("Modèles de cartes (admin)", () => {
     body?: Record<string, unknown>;
   }[];
   let failList = false;
+  let failUpload = false;
+  let uploads: { name: string; type: string; size: number }[];
   let root: Root;
   let host: HTMLDivElement;
 
   beforeEach(() => {
     failList = false;
+    failUpload = false;
+    uploads = [];
     calls = [];
+    URL.createObjectURL = () => "blob:apercu";
+    URL.revokeObjectURL = () => {};
     store = [
       model({ id: 1, nom: "Pro noir", actif: true }),
       model({
@@ -54,7 +60,8 @@ describe("Modèles de cartes (admin)", () => {
     document.body.appendChild(host);
     root = createRoot(host);
     api.defaults.adapter = async config => {
-      const body = config.data ? JSON.parse(config.data) : undefined;
+      const body =
+        typeof config.data === "string" ? JSON.parse(config.data) : undefined;
       const url = (config.url ?? "").replace(/^\//, "");
       calls.push({ method: config.method, url: config.url, body });
       const mk = (data: unknown, status = 200) => ({
@@ -78,6 +85,34 @@ describe("Modèles de cartes (admin)", () => {
             mk({ error: { message: "Serveur indisponible" } }, 500),
           );
         return mk({ modeles: store });
+      }
+      if (
+        config.method === "post" &&
+        url === "admin/production/modeles-cartes/images"
+      ) {
+        const file = config.data as File;
+        uploads.push({
+          name: file.name,
+          type: String(config.headers.get("Content-Type")),
+          size: file.size,
+        });
+        if (failUpload)
+          throw new AxiosError(
+            "fail",
+            "422",
+            config,
+            undefined,
+            mk(
+              { error: { message: "Format d’image refusé par le serveur" } },
+              422,
+            ),
+          );
+        return mk(
+          {
+            url: `http://localhost:4000/api/media/cartes/0a1b2c3d-0000-4000-8000-00000000000${uploads.length}.webp`,
+          },
+          201,
+        );
       }
       if (config.method === "post") {
         if (body.actif)
@@ -141,6 +176,25 @@ describe("Modèles de cartes (admin)", () => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   };
+  const png = (name = "recto.png", type = "image/png", size = 2048) =>
+    new File([new ArrayBuffer(size)], name, { type });
+  const pick = async (input: HTMLInputElement, file: File) => {
+    Object.defineProperty(input, "files", {
+      value: [file],
+      configurable: true,
+    });
+    await act(
+      async () =>
+        void input.dispatchEvent(new Event("change", { bubbles: true })),
+    );
+  };
+  const nomInput = () =>
+    dialog().querySelector<HTMLInputElement>(
+      'input:not([type="checkbox"]):not([type="file"])',
+    )!;
+  const fileInputs = () => [
+    ...dialog().querySelectorAll<HTMLInputElement>('input[type="file"]'),
+  ];
   const dialog = () =>
     document.body.querySelector<HTMLElement>('[role="dialog"]')!;
   const called = (method: string, url: string) =>
@@ -186,51 +240,66 @@ describe("Modèles de cartes (admin)", () => {
     expect(section("Signature").textContent).toContain("Aucun modèle actif");
   });
 
-  it("ajouter un modèle : refuse une adresse non sécurisée, puis envoie la formule, le nom et les deux faces", async () => {
+  it("ajouter un modèle : choisir deux fichiers, aucun champ de lien", async () => {
     await open();
     await click(button(section("Essentielle"), "Ajouter un modèle"));
     expect(dialog().getAttribute("aria-label")).toBe(
       "Nouveau modèle Essentielle",
     );
-    const [nom, recto, verso] = [
-      ...dialog().querySelectorAll<HTMLInputElement>(
-        'input:not([type="checkbox"])',
-      ),
-    ];
+    expect(dialog().querySelector('input[type="url"]')).toBeNull(); // plus de lien à coller
+    expect(fileInputs()).toHaveLength(2);
+    expect(fileInputs()[0].accept).toBe("image/jpeg,image/png,image/webp");
+  });
+
+  it("refuse un fichier qui n'est pas une image JPEG, PNG ou WebP, ou qui dépasse 12 Mo", async () => {
+    await open();
+    await click(button(section("Essentielle"), "Ajouter un modèle"));
+    await pick(fileInputs()[0], png("doc.pdf", "application/pdf"));
+    expect(dialog().textContent).toContain("Format non pris en charge");
+    await pick(fileInputs()[1], png("gros.png", "image/png", 13 * 1024 * 1024));
+    expect(dialog().textContent).toContain("dépasse 12 Mo");
+    await type(nomInput(), "Essentielle bleu");
+    expect(button(dialog(), "Ajouter le modèle").disabled).toBe(true); // rien d'accepté
+    expect(uploads).toHaveLength(0);
+  });
+
+  it("ajouter : envoie les deux images (corps binaire, bon type), puis crée le modèle avec leurs adresses", async () => {
+    await open();
+    await click(button(section("Essentielle"), "Ajouter un modèle"));
     const submit = button(dialog(), "Ajouter le modèle");
-    await type(nom, "Essentielle bleu");
-    await type(recto, "http://cdn.exemple.sn/r.png");
-    await type(verso, "https://cdn.exemple.sn/v.png");
+    await type(nomInput(), "Essentielle bleu");
+    expect(submit.disabled).toBe(true); // les deux faces sont obligatoires
+    await pick(fileInputs()[0], png("recto.png", "image/png"));
     expect(submit.disabled).toBe(true);
-    expect(dialog().textContent).toContain("https://");
-    await type(recto, "https://cdn.exemple.sn/r.png");
+    await pick(fileInputs()[1], png("verso.webp", "image/webp"));
     expect(submit.disabled).toBe(false);
-    expect(dialog().querySelectorAll("img")).toHaveLength(2); // aperçu des deux faces avant d'enregistrer
+    expect(dialog().querySelectorAll("img")).toHaveLength(2); // aperçu des deux faces avant l'envoi
+    expect(calls.some(c => c.url?.endsWith("/images"))).toBe(false); // rien n'est envoyé avant la validation
 
     await click(submit);
+    expect(uploads.map(u => [u.name, u.type])).toEqual([
+      ["recto.png", "image/png"],
+      ["verso.webp", "image/webp"],
+    ]);
     expect(called("post", "/admin/production/modeles-cartes")?.body).toEqual({
       tier: "essentielle",
       nom: "Essentielle bleu",
-      rectoUrl: "https://cdn.exemple.sn/r.png",
-      versoUrl: "https://cdn.exemple.sn/v.png",
+      rectoUrl:
+        "http://localhost:4000/api/media/cartes/0a1b2c3d-0000-4000-8000-000000000001.webp",
+      versoUrl:
+        "http://localhost:4000/api/media/cartes/0a1b2c3d-0000-4000-8000-000000000002.webp",
       actif: false,
     });
-    expect(document.body.querySelector('[role="dialog"]')).toBeNull(); // modale fermée
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull(); // fenêtre fermée
     expect(section("Essentielle").textContent).toContain("Essentielle bleu");
-    expect(section("Essentielle").textContent).toContain("Aucun modèle actif"); // créé inactif par défaut
   });
 
   it("ajouter avec « afficher dès maintenant » active le modèle", async () => {
     await open();
     await click(button(section("Essentielle"), "Ajouter un modèle"));
-    const [nom, recto, verso] = [
-      ...dialog().querySelectorAll<HTMLInputElement>(
-        'input:not([type="checkbox"])',
-      ),
-    ];
-    await type(nom, "Essentielle bleu");
-    await type(recto, "https://cdn.exemple.sn/r.png");
-    await type(verso, "https://cdn.exemple.sn/v.png");
+    await type(nomInput(), "Essentielle bleu");
+    await pick(fileInputs()[0], png());
+    await pick(fileInputs()[1], png("verso.png"));
     await click(
       dialog().querySelector<HTMLInputElement>('input[type="checkbox"]')!,
     );
@@ -241,6 +310,22 @@ describe("Modèles de cartes (admin)", () => {
     expect(
       section("Essentielle").querySelector(".mc-active")?.textContent,
     ).toContain("Essentielle bleu");
+  });
+
+  it("si un envoi échoue, le modèle n'est pas créé et la fenêtre reste ouverte", async () => {
+    failUpload = true;
+    await open();
+    await click(button(section("Essentielle"), "Ajouter un modèle"));
+    await type(nomInput(), "Essentielle bleu");
+    await pick(fileInputs()[0], png());
+    await pick(fileInputs()[1], png("verso.png"));
+    await click(button(dialog(), "Ajouter le modèle"));
+    expect(document.body.textContent).toContain(
+      "Format d’image refusé par le serveur",
+    );
+    expect(called("post", "/admin/production/modeles-cartes")).toBeUndefined();
+    expect(dialog()).toBeTruthy();
+    expect(button(dialog(), "Ajouter le modèle").disabled).toBe(false); // on peut réessayer
   });
 
   it("supprimer demande une confirmation, puis retire le modèle", async () => {
@@ -262,20 +347,31 @@ describe("Modèles de cartes (admin)", () => {
     expect(section("Signature").textContent).toContain("Signature or");
   });
 
-  it("modifier un modèle envoie le nom et les adresses", async () => {
+  it("modifier : changer seulement le nom n'envoie aucune image et ne touche pas aux faces", async () => {
     await open();
     await click(button(section("Pro"), "Modifier", 0));
-    const [nom] = [
-      ...dialog().querySelectorAll<HTMLInputElement>(
-        'input:not([type="checkbox"])',
-      ),
-    ];
-    await type(nom, "Pro noir mat");
+    await type(nomInput(), "Pro noir mat");
     await click(button(dialog(), "Enregistrer"));
-    expect(
-      called("patch", "/admin/production/modeles-cartes/1")?.body,
-    ).toMatchObject({ nom: "Pro noir mat" });
+    expect(uploads).toHaveLength(0);
+    expect(called("patch", "/admin/production/modeles-cartes/1")?.body).toEqual(
+      { nom: "Pro noir mat" },
+    );
     expect(section("Pro").textContent).toContain("Pro noir mat");
+  });
+
+  it("modifier : remplacer seulement le verso envoie une image et ne change que le verso", async () => {
+    await open();
+    await click(button(section("Pro"), "Modifier", 0));
+    expect(dialog().querySelectorAll("img")).toHaveLength(2); // faces actuelles affichées
+    await pick(fileInputs()[1], png("nouveau-verso.png"));
+    await click(button(dialog(), "Enregistrer"));
+    expect(uploads.map(u => u.name)).toEqual(["nouveau-verso.png"]);
+    const body = called("patch", "/admin/production/modeles-cartes/1")?.body;
+    expect(body).toMatchObject({
+      nom: "Pro noir",
+      versoUrl: expect.stringContaining("/api/media/cartes/"),
+    });
+    expect(body).not.toHaveProperty("rectoUrl");
   });
 
   it("une erreur du serveur est affichée", async () => {

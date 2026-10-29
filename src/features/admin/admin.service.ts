@@ -185,6 +185,14 @@ export const adminApi = {
   // Modèles de carte (recto / verso affichés au client dans sa demande de carte)
   listModelesCartes: () =>
     get<{ modeles: ModeleCarte[] }>("/admin/production/modeles-cartes"),
+  /** Envoie une image de carte (corps binaire) ; renvoie l'adresse à mettre dans rectoUrl / versoUrl. */
+  uploadCardImage: (file: File) =>
+    call(
+      api.post<{ url: string }>("/admin/production/modeles-cartes/images", file, {
+        headers: { "Content-Type": file.type },
+        transformRequest: [data => data],
+      }),
+    ),
   createModeleCarte: (b: CreateModeleCarteInput) =>
     post<{ modele: ModeleCarte }>("/admin/production/modeles-cartes", b),
   updateModeleCarte: (id: number, b: PatchModeleCarteInput) =>

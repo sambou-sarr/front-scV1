@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { adminApi } from '../admin.service';
 import { Badge, Btn, ConfirmModal, ErrorBox, Field, Loading, Modal, useAction } from '../components/ui';
@@ -9,12 +9,27 @@ import type { Formule, ModeleCarte } from '../../../types/admin';
 /*
   Modèles de carte : le recto et le verso que le client voit quand il demande une carte physique.
   Un seul modèle ACTIF par formule ; sans modèle actif, le client voit l'aperçu par défaut.
-  Les images sont des adresses https déjà hébergées (Cloudinary…), comme les fichiers d'impression.
+  Les images sont téléversées ici (JPEG, PNG ou WebP, 12 Mo max) : le serveur les optimise et les héberge. Les anciens
+  modèles créés avec un lien https restent affichés et peuvent être remplacés par un fichier.
 */
 const TIERS = Object.keys(FORMULES) as Formule[];
-const isHttps = (u: string) => {
-  try { return new URL(u.trim()).protocol === 'https:'; } catch { return false; }
-};
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_BYTES = 12 * 1024 * 1024;
+/** Message d'erreur si le fichier ne peut pas être envoyé, sinon null. */
+const checkFile = (f: File): string | null =>
+  !ACCEPTED.includes(f.type) ? 'Format non pris en charge : utilisez une image JPEG, PNG ou WebP.' : f.size > MAX_BYTES ? 'L’image dépasse 12 Mo.' : null;
+
+/** Adresse d'aperçu d'un fichier choisi (libérée dès que le fichier change ou que la fenêtre se ferme). */
+function usePreview(file: File | null) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file || typeof URL.createObjectURL !== 'function') { setUrl(null); return; }
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+  return url;
+}
 
 /** Une face de carte ; une adresse cassée affiche un message au lieu d'une image vide. */
 function Face({ url, label }: { url: string; label: string }) {
@@ -33,23 +48,56 @@ const Faces = ({ m }: { m: Pick<ModeleCarte, 'nom' | 'rectoUrl' | 'versoUrl'> })
   </div>
 );
 
+/** Choix d'une image : le fichier choisi remplace l'image actuelle (modification) ; un fichier invalide est refusé. */
+function ImagePicker({ label, file, error, onPick }: { label: string; file: File | null; error: string | null; onPick: (f: File | null, error: string | null) => void }) {
+  return (
+    <Field label={label} hint={file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} Mo` : 'JPEG, PNG ou WebP · 12 Mo max'}>
+      <input
+        type="file"
+        accept={ACCEPTED.join(',')}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          const problem = f ? checkFile(f) : null;
+          onPick(f && !problem ? f : null, problem);
+          if (problem) e.target.value = '';
+        }}
+      />
+      {error && <span className="note-gold" role="alert">{error}</span>}
+    </Field>
+  );
+}
+
 function ModeleModal({ tier, modele, onClose, onSaved }: { tier: Formule; modele?: ModeleCarte; onClose: () => void; onSaved: () => void }) {
   const [nom, setNom] = useState(modele?.nom ?? '');
-  const [recto, setRecto] = useState(modele?.rectoUrl ?? '');
-  const [verso, setVerso] = useState(modele?.versoUrl ?? '');
+  const [recto, setRecto] = useState<File | null>(null);
+  const [verso, setVerso] = useState<File | null>(null);
+  const [rectoErr, setRectoErr] = useState<string | null>(null);
+  const [versoErr, setVersoErr] = useState<string | null>(null);
   const [actif, setActif] = useState(false);
   const [busy, setBusy] = useState(false);
   const run = useAction();
-  const erreur = !nom.trim() ? 'Donne un nom au modèle.' : !isHttps(recto) ? 'L’adresse du recto doit commencer par https://' : !isHttps(verso) ? 'L’adresse du verso doit commencer par https://' : null;
+  const rectoPreview = usePreview(recto);
+  const versoPreview = usePreview(verso);
+  const rectoSrc = rectoPreview ?? modele?.rectoUrl ?? null;
+  const versoSrc = versoPreview ?? modele?.versoUrl ?? null;
+  // Création : les deux faces sont obligatoires. Modification : on peut ne changer que le nom ou qu'une seule face.
+  const erreur = !nom.trim() ? 'Donne un nom au modèle.' : !modele && !recto ? 'Choisis l’image du recto.' : !modele && !verso ? 'Choisis l’image du verso.' : rectoErr ?? versoErr;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (erreur) return;
     setBusy(true);
-    const body = { nom: nom.trim(), rectoUrl: recto.trim(), versoUrl: verso.trim() };
-    const r = modele
-      ? await run(() => adminApi.updateModeleCarte(modele.id, body), 'Modèle enregistré')
-      : await run(() => adminApi.createModeleCarte({ tier, ...body, actif }), actif ? 'Modèle ajouté et activé' : 'Modèle ajouté');
+    const r = await run(
+      async () => {
+        // Envoi d'abord, enregistrement ensuite : si un envoi échoue, rien n'est créé ni modifié.
+        const rectoUrl = recto ? (await adminApi.uploadCardImage(recto)).url : undefined;
+        const versoUrl = verso ? (await adminApi.uploadCardImage(verso)).url : undefined;
+        return modele
+          ? adminApi.updateModeleCarte(modele.id, { nom: nom.trim(), ...(rectoUrl && { rectoUrl }), ...(versoUrl && { versoUrl }) })
+          : adminApi.createModeleCarte({ tier, nom: nom.trim(), rectoUrl: rectoUrl!, versoUrl: versoUrl!, actif });
+      },
+      modele ? 'Modèle enregistré' : actif ? 'Modèle ajouté et activé' : 'Modèle ajouté',
+    );
     setBusy(false);
     if (r) { onSaved(); onClose(); }
   };
@@ -57,12 +105,12 @@ function ModeleModal({ tier, modele, onClose, onSaved }: { tier: Formule; modele
     <Modal title={modele ? `Modifier « ${modele.nom} »` : `Nouveau modèle ${FORMULES[tier]}`} onClose={onClose} wide>
       <form className="form" onSubmit={submit}>
         <Field label="Nom du modèle" hint="Visible seulement ici (ex. « Noir mat 2026 »)"><input value={nom} onChange={(e) => setNom(e.target.value)} maxLength={80} autoFocus /></Field>
-        <Field label="Recto (adresse de l’image)"><input type="url" value={recto} onChange={(e) => setRecto(e.target.value)} placeholder="https://…" /></Field>
-        <Field label="Verso (adresse de l’image)"><input type="url" value={verso} onChange={(e) => setVerso(e.target.value)} placeholder="https://…" /></Field>
-        {isHttps(recto) && isHttps(verso) && <Faces m={{ nom: nom.trim() || 'Aperçu', rectoUrl: recto.trim(), versoUrl: verso.trim() }} />}
+        <ImagePicker label={modele ? 'Recto (laisser vide pour garder l’actuel)' : 'Recto'} file={recto} error={rectoErr} onPick={(f, p) => { setRecto(f); setRectoErr(p); }} />
+        <ImagePicker label={modele ? 'Verso (laisser vide pour garder l’actuel)' : 'Verso'} file={verso} error={versoErr} onPick={(f, p) => { setVerso(f); setVersoErr(p); }} />
+        {rectoSrc && versoSrc && <Faces m={{ nom: nom.trim() || 'Aperçu', rectoUrl: rectoSrc, versoUrl: versoSrc }} />}
         {!modele && <label className="mc-check"><input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} /> Afficher ce modèle aux clients {FORMULES[tier]} dès maintenant <span className="adm-muted">(remplace le modèle actif)</span></label>}
         {erreur && (nom || recto || verso) && <p className="note-gold" role="alert">{erreur}</p>}
-        <div className="form-a"><Btn onClick={onClose}>Annuler</Btn><button className="adm-btn adm-btn-red" type="submit" disabled={!!erreur || busy}>{modele ? 'Enregistrer' : 'Ajouter le modèle'}</button></div>
+        <div className="form-a"><Btn onClick={onClose}>Annuler</Btn><button className="adm-btn adm-btn-red" type="submit" disabled={!!erreur || busy}>{busy ? 'Envoi des images…' : modele ? 'Enregistrer' : 'Ajouter le modèle'}</button></div>
       </form>
     </Modal>
   );
