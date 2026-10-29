@@ -40,7 +40,7 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
       if (granularity === "month" && month) params.set("month", month);
       const response = await api.get<{ stats: PassageStats }>(
         `fiches/${ficheId}/stats?${params.toString()}`,
-        { signal },
+        { signal }
       );
       return response.data.stats;
     },
@@ -51,17 +51,28 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
   const historyPageCount = Math.ceil(history.length / HISTORY_PAGE_SIZE);
   const visibleHistory = history.slice(
     (historyPage - 1) * HISTORY_PAGE_SIZE,
-    historyPage * HISTORY_PAGE_SIZE,
+    historyPage * HISTORY_PAGE_SIZE
   );
   const countCards = [
-    { label: "Total des passages", value: stats?.totals.total ?? 0, key: "total" },
+    {
+      label: "Total des passages",
+      value: stats?.totals.total ?? 0,
+      key: "total",
+    },
     { label: "QR code", value: stats?.totals.qr ?? 0, key: "qr" },
     { label: "NFC", value: stats?.totals.nfc ?? 0, key: "nfc" },
-    { label: "Accès directs / autres", value: stats?.totals.direct ?? 0, key: "direct" },
+    {
+      label: "Accès directs / autres",
+      value: stats?.totals.direct ?? 0,
+      key: "direct",
+    },
   ];
 
   return (
-    <aside className="fiche-passage-panel" aria-labelledby="fiche-passage-title">
+    <aside
+      className="fiche-passage-panel"
+      aria-labelledby="fiche-passage-title"
+    >
       <div className="fiche-passage-heading">
         <div>
           <h2 id="fiche-passage-title">Statistiques des passages</h2>
@@ -84,7 +95,9 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
           Regroupement
           <select
             value={granularity}
-            onChange={event => setGranularity(event.target.value as "day" | "month")}
+            onChange={event =>
+              setGranularity(event.target.value as "day" | "month")
+            }
           >
             <option value="month">Par mois</option>
             <option value="day">Par jour</option>
@@ -93,28 +106,41 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
         {granularity === "day" ? (
           <label>
             Filtrer par date
-            <input type="date" value={date} onChange={event => setDate(event.target.value)} />
+            <input
+              type="date"
+              value={date}
+              onChange={event => setDate(event.target.value)}
+            />
           </label>
         ) : (
           <label>
             Filtrer par mois
-            <input type="month" value={month} onChange={event => setMonth(event.target.value)} />
+            <input
+              type="month"
+              value={month}
+              onChange={event => setMonth(event.target.value)}
+            />
           </label>
         )}
         <p className="fiche-passage-filter-hint">
           Sans filtre, tout l’historique détaillé disponible est affiché.
         </p>
         <p className="fiche-passage-filter-hint">
-          Les anciens compteurs sans date ni source ne peuvent pas être répartis rétroactivement entre QR, NFC et accès directs.
+          Les anciens compteurs sans date ni source ne peuvent pas être répartis
+          rétroactivement entre QR, NFC et accès directs.
         </p>
       </div>
 
       {statsQuery.isPending ? (
-        <p className="fiche-passage-state" role="status">Chargement des statistiques…</p>
+        <p className="fiche-passage-state" role="status">
+          Chargement des statistiques…
+        </p>
       ) : statsQuery.isError ? (
         <div className="fiche-passage-state" role="alert">
           <p>Impossible de charger les statistiques.</p>
-          <button type="button" onClick={() => void statsQuery.refetch()}>Réessayer</button>
+          <button type="button" onClick={() => void statsQuery.refetch()}>
+            Réessayer
+          </button>
         </div>
       ) : (
         <>
@@ -127,7 +153,9 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
             ))}
           </div>
           <div className="fiche-passage-history">
-            <h3>Historique {granularity === "day" ? "journalier" : "mensuel"}</h3>
+            <h3>
+              Historique {granularity === "day" ? "journalier" : "mensuel"}
+            </h3>
             {stats?.history.length ? (
               <div className="fiche-passage-table-wrap">
                 <table>
@@ -154,18 +182,26 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
                 </table>
               </div>
             ) : (
-              <p className="fiche-passage-empty">Aucun passage enregistré pour cette période.</p>
+              <p className="fiche-passage-empty">
+                Aucun passage enregistré pour cette période.
+              </p>
             )}
             {historyPageCount > 1 && (
-              <nav className="fiche-passage-pagination" aria-label="Pagination de l’historique">
+              <nav
+                className="fiche-passage-pagination"
+                aria-label="Pagination de l’historique"
+              >
                 <span>
-                  {((historyPage - 1) * HISTORY_PAGE_SIZE) + 1}–
-                  {Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} sur {history.length}
+                  {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–
+                  {Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)}{" "}
+                  sur {history.length}
                 </span>
                 <div>
                   <button
                     type="button"
-                    onClick={() => setHistoryPage(page => Math.max(1, page - 1))}
+                    onClick={() =>
+                      setHistoryPage(page => Math.max(1, page - 1))
+                    }
                     disabled={historyPage === 1}
                     aria-label="Page précédente de l’historique"
                   >
@@ -176,7 +212,11 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setHistoryPage(page => Math.min(historyPageCount, page + 1))}
+                    onClick={() =>
+                      setHistoryPage(page =>
+                        Math.min(historyPageCount, page + 1)
+                      )
+                    }
                     disabled={historyPage === historyPageCount}
                     aria-label="Page suivante de l’historique"
                   >
@@ -191,7 +231,6 @@ function PassageStatsPanel({ ficheId }: { ficheId: number }) {
     </aside>
   );
 }
-
 
 type RappelRequest = {
   id: number;
@@ -213,14 +252,17 @@ function RappelsPanel({ ficheId }: { ficheId: number }) {
     queryFn: async ({ signal }) => {
       const response = await api.get<{ rappels: RappelsResponse }>(
         `fiches/${ficheId}/rappels`,
-        { signal },
+        { signal }
       );
       return response.data.rappels;
     },
   });
 
   return (
-    <section className="fiche-passage-panel fiche-rappels-panel" aria-labelledby="fiche-rappels-title">
+    <section
+      className="fiche-passage-panel fiche-rappels-panel"
+      aria-labelledby="fiche-rappels-title"
+    >
       <div className="fiche-passage-heading">
         <div>
           <h2 id="fiche-rappels-title">Demandes de rappel</h2>
@@ -239,18 +281,24 @@ function RappelsPanel({ ficheId }: { ficheId: number }) {
       </div>
 
       {rappelsQuery.isPending ? (
-        <p className="fiche-passage-state" role="status">Chargement des demandes…</p>
+        <p className="fiche-passage-state" role="status">
+          Chargement des demandes…
+        </p>
       ) : rappelsQuery.isError ? (
         <div className="fiche-passage-state" role="alert">
           <p>Impossible de charger les demandes de rappel.</p>
-          <button type="button" onClick={() => void rappelsQuery.refetch()}>Réessayer</button>
+          <button type="button" onClick={() => void rappelsQuery.refetch()}>
+            Réessayer
+          </button>
         </div>
       ) : (
         <>
           <div className="fiche-passage-cards fiche-rappel-summary">
             <div className="fiche-passage-card">
               <span>Total des demandes enregistrées</span>
-              <strong>{(rappelsQuery.data?.total ?? 0).toLocaleString("fr-FR")}</strong>
+              <strong>
+                {(rappelsQuery.data?.total ?? 0).toLocaleString("fr-FR")}
+              </strong>
             </div>
           </div>
           {rappelsQuery.data?.demandes.length ? (
@@ -267,21 +315,30 @@ function RappelsPanel({ ficheId }: { ficheId: number }) {
                   {rappelsQuery.data.demandes.map(demande => (
                     <tr key={demande.id}>
                       <td>{demande.nom}</td>
-                      <td><a href={`tel:${demande.telephone}`}>{demande.telephone}</a></td>
-                      <td>{new Intl.DateTimeFormat("fr-FR", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(demande.createdAt))}</td>
+                      <td>
+                        <a href={`tel:${demande.telephone}`}>
+                          {demande.telephone}
+                        </a>
+                      </td>
+                      <td>
+                        {new Intl.DateTimeFormat("fr-FR", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(demande.createdAt))}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="fiche-passage-empty">Aucune demande de rappel pour le moment.</p>
+            <p className="fiche-passage-empty">
+              Aucune demande de rappel pour le moment.
+            </p>
           )}
           <p className="fiche-passage-filter-hint">
-            Les demandes les plus récentes sont affichées en premier (maximum 100).
+            Les demandes les plus récentes sont affichées en premier (maximum
+            100).
           </p>
         </>
       )}
@@ -313,8 +370,16 @@ function FicheDashboardPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [cardDialogOpen]);
   const sections = [
-    { id: "overview" as const, label: "Statistiques", description: "Passages et sources" },
-    { id: "rappels" as const, label: "Demandes de rappel", description: "Coordonnées reçues" },
+    {
+      id: "overview" as const,
+      label: "Statistiques",
+      description: "Passages et sources",
+    },
+    {
+      id: "rappels" as const,
+      label: "Demandes de rappel",
+      description: "Coordonnées reçues",
+    },
     { id: "carte" as const, label: "Carte", description: "Carte physique NFC" },
   ];
 
@@ -323,10 +388,16 @@ function FicheDashboardPanel({
       <header className="fiche-dashboard-header">
         <div>
           <h2>Tableau de bord de la fiche</h2>
-          <p>Suivez les passages, les demandes de rappel et le suivi de votre carte.</p>
+          <p>
+            Suivez les passages, les demandes de rappel et le suivi de votre
+            carte.
+          </p>
         </div>
       </header>
-      <nav className="fiche-dashboard-nav" aria-label="Rubriques du tableau de bord de la fiche">
+      <nav
+        className="fiche-dashboard-nav"
+        aria-label="Rubriques du tableau de bord de la fiche"
+      >
         {sections.map(section => (
           <button
             key={section.id}
@@ -345,13 +416,7 @@ function FicheDashboardPanel({
       ) : activeSection === "rappels" ? (
         <RappelsPanel ficheId={ficheId} />
       ) : (
-        <section className="fiche-card-request">
-          <div className="fiche-card-request-art" aria-hidden="true">
-            <span>Support Connecté</span>
-            <strong>{formula}</strong>
-            <i />
-            <i />
-          </div>
+        <section className="">
           <div className="fiche-card-request-copy">
             <p className="fiche-card-request-eyebrow">Carte physique NFC</p>
             <h3>Votre fiche, toujours à portée de main.</h3>
@@ -384,7 +449,9 @@ function FicheDashboardPanel({
               >
                 <header>
                   <div>
-                    <p className="fiche-card-request-eyebrow">Carte physique NFC</p>
+                    <p className="fiche-card-request-eyebrow">
+                      Carte physique NFC
+                    </p>
                     <h3 id="fiche-card-dialog-title">
                       Demande de carte — {ficheName}
                     </h3>
@@ -498,7 +565,12 @@ export function FichePage() {
         <div className="fiche-preview-stage">
           <div className="fiche-preview-device">
             <div className="fiche-preview-device-in" ref={phoneScroller}>
-              <Fiche key={fiche.id} fiche={fiche} scrollerRef={phoneScroller} ownerTools />
+              <Fiche
+                key={fiche.id}
+                fiche={fiche}
+                scrollerRef={phoneScroller}
+                ownerTools
+              />
             </div>
           </div>
         </div>
