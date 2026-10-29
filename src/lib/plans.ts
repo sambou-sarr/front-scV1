@@ -51,8 +51,6 @@ export const TAB_TYPES: Record<TabType, TabTypeInfo> = {
   },
 };
 
-
-
 export const PLANS: Record<Formule, Plan> = {
   essentielle: {
     label: "Essentielle",
@@ -293,7 +291,7 @@ const isEssentialDefaultTabs = (tabs: Onglet[]) => {
  * pas prise pour un ancien modèle.
  */
 export const hasLegacyEssentialTemplate = (
-  fiche: Pick<FicheRecord, "formule" | "data">,
+  fiche: Pick<FicheRecord, "formule" | "data">
 ) =>
   fiche.formule === "signature" &&
   !!fiche.data.onglets?.length &&
@@ -312,7 +310,7 @@ export const configuredTabs = (
 
 /** Remplace l'ancien thème Essentielle tant que la fiche conserve ses onglets initiaux. */
 export const signatureHeader = (
-  fiche: Pick<FicheRecord, "formule" | "planCapabilities" | "data">,
+  fiche: Pick<FicheRecord, "formule" | "planCapabilities" | "data">
 ) => {
   const header = fiche.data.entete;
   if (
@@ -332,7 +330,7 @@ export const signatureHeader = (
  * sticker. Hors Signature, l'entête enregistré est ignoré ; les valeurs interdites par la formule sont corrigées.
  */
 export function resolveHeader(
-  fiche: Pick<FicheRecord, "formule" | "planCapabilities" | "data">,
+  fiche: Pick<FicheRecord, "formule" | "planCapabilities" | "data">
 ): EnteteComplete {
   const plan = planOf(fiche);
   const header: EnteteComplete = {
@@ -341,7 +339,8 @@ export function resolveHeader(
     theme: plan.theme,
     ...(fiche.formule === "signature" ? signatureHeader(fiche) : {}),
   };
-  if (!plan.headerLayouts.includes(header.disposition)) header.disposition = "portrait";
+  if (!plan.headerLayouts.includes(header.disposition))
+    header.disposition = "portrait";
   if (!plan.themes.includes(header.theme)) header.theme = plan.theme;
   return header;
 }
@@ -352,7 +351,7 @@ export function resolveHeader(
  * sont respectés (par exemple le thème bleu, identique à l'ancien thème par défaut).
  */
 export function migrateLegacySignature(
-  fiche: FicheRecord,
+  fiche: FicheRecord
 ): Pick<FicheData, "onglets" | "entete"> | null {
   if (!hasLegacyEssentialTemplate(fiche)) return null;
   const entete = signatureHeader(fiche);

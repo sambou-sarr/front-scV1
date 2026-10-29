@@ -5,12 +5,12 @@ import { ENV } from "../../../lib/env";
 import { resolveHeader, visibleTabs } from "../../../lib/plans";
 import type { FicheRecord } from "../../../types";
 import { downloadVCard } from "../lib/vcard";
+import "./Fiche.css";
 import { I } from "./fiche/Icon";
 import { QR } from "./fiche/QR";
 import { Section } from "./fiche/Section";
 import { initials, wa } from "./fiche/format";
 import { usePullQR } from "./fiche/usePullQR";
-import "./Fiche.css";
 
 /*
   Fiche connectée V2 (page publique ouverte par la carte NFC / le QR).
@@ -50,8 +50,10 @@ export default function Fiche({
   const e = resolveHeader(fiche);
   const tabs = visibleTabs(fiche);
   const [open, setOpen] = useState(
-    () => new Set(tabs.slice(0, 1).map(t => t.id)),
+    () => new Set(tabs.slice(0, 1).map(t => t.id))
   );
+
+  console.log(e);
   const url = `${baseUrl ?? `${publicAppUrl}/f/`}${fiche.slug}?source=qr`;
   const name = `${fiche.prenom} ${fiche.nom}`.trim();
   const actions = [
@@ -78,7 +80,7 @@ export default function Fiche({
     .sort(
       (a, b) =>
         Number(b.k === fiche.data.premierBouton) -
-        Number(a.k === fiche.data.premierBouton),
+        Number(a.k === fiche.data.premierBouton)
     );
   const avatar = (cls = "") => (
     <span className={`f-av ${cls}`}>
