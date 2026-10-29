@@ -11,6 +11,8 @@ export default function PublicFicheState({
   loading?: boolean;
   error?: unknown;
 }) {
+
+  
   if (loading) {
     return (
       <main className="fiche-public-state" role="status">
