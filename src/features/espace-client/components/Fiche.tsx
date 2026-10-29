@@ -53,7 +53,6 @@ export default function Fiche({
     () => new Set(tabs.slice(0, 1).map(t => t.id))
   );
 
-  console.log(e);
   const url = `${baseUrl ?? `${publicAppUrl}/f/`}${fiche.slug}?source=qr`;
   const name = `${fiche.prenom} ${fiche.nom}`.trim();
   const actions = [
