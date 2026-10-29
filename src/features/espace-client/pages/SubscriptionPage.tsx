@@ -3,12 +3,12 @@ import { isAxiosError } from "axios";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ApiFicheSummary } from "../../../types";
-import { StatCard } from "../components/StatCard";
 import { CardRequestPanel } from "../components/CardRequestPanel";
 import {
   FicheListControls,
   FichePagination,
 } from "../components/FicheListControls";
+import { StatCard } from "../components/StatCard";
 import { PaymentModal } from "../components/subscription/PaymentModal";
 import {
   getPlan,
@@ -17,13 +17,13 @@ import {
   PlansPanel,
 } from "../components/subscription/PlansPanel";
 import { getDashboardFiche, getKpi } from "../espaceClient.service";
-import { renewalInfo } from "../lib/renewal";
 import {
   DEFAULT_FICHE_LIST_FILTERS,
   filterFiches,
   pageFiches,
   type FicheListFilters,
 } from "../lib/ficheList";
+import { renewalInfo } from "../lib/renewal";
 
 export type SubscriptionKpi = {
   data: {
@@ -57,7 +57,7 @@ function getSubscriptionExpiry(fiche: ApiFicheSummary) {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const daysRemaining = Math.ceil(
-    (endDate.getTime() - today.getTime()) / 86_400_000,
+    (endDate.getTime() - today.getTime()) / 86_400_000
   );
 
   return {
@@ -92,7 +92,9 @@ function SubscriptionExpiry({ fiche }: { fiche: ApiFicheSummary }) {
 
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
-  const [paymentFiche, setPaymentFiche] = useState<ApiFicheSummary | null>(null);
+  const [paymentFiche, setPaymentFiche] = useState<ApiFicheSummary | null>(
+    null
+  );
   // /abonnements?renew=<id> : ouvre directement la fenêtre de renouvellement de cette fiche (liens du tableau de bord et de l'éditeur).
   const [searchParams, setSearchParams] = useSearchParams();
   const renewId = Number(searchParams.get("renew")) || null;
@@ -103,7 +105,7 @@ export default function SubscriptionPage() {
         params.delete("renew");
         return params;
       },
-      { replace: true },
+      { replace: true }
     );
   const closePayment = () => {
     setPaymentFiche(null);
@@ -146,7 +148,7 @@ export default function SubscriptionPage() {
   const ficheCount = fiches?.length ?? 0;
   const filteredFiches = useMemo(
     () => filterFiches(fiches ?? [], filters),
-    [fiches, filters],
+    [fiches, filters]
   );
   const pageData = pageFiches(filteredFiches, page);
   const updateFilters = (next: FicheListFilters) => {
@@ -234,9 +236,6 @@ export default function SubscriptionPage() {
                   {ficheCount} fiche{ficheCount > 1 ? "s" : ""} au total
                 </p>
               </div>
-              <span className="inline-flex w-fit items-center rounded-full bg-[#eee9e1] px-3 py-1.5 text-xs font-medium text-[#6d665d]">
-                Données de votre espace client
-              </span>
             </div>
             {isFichesPending ? (
               <div className="flex items-center justify-center gap-3 px-6 py-16 text-sm text-[#6d665d]">
@@ -280,10 +279,7 @@ export default function SubscriptionPage() {
               </div>
             ) : (
               <>
-                <FicheListControls
-                  filters={filters}
-                  onChange={updateFilters}
-                />
+                <FicheListControls filters={filters} onChange={updateFilters} />
                 {pageData.items.length === 0 ? (
                   <div className="px-6 py-12 text-center">
                     <p className="text-sm text-[#6d665d]">
@@ -298,183 +294,190 @@ export default function SubscriptionPage() {
                     </button>
                   </div>
                 ) : (
-                <>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[900px] border-collapse text-left">
-                    <thead className="bg-[#f7f5f1] text-[11px] font-semibold uppercase tracking-[0.1em] text-[#6d665d]">
-                      <tr>
-                        <th className="px-5 py-3.5">Fiche</th>
-                        <th className="px-4 py-3.5">Formule</th>
-                        <th className="px-4 py-3.5">Secteur</th>
-                        <th className="px-4 py-3.5">Téléphone</th>
-                        <th className="px-4 py-3.5">WhatsApp</th>
-                        <th className="px-4 py-3.5">Échéance</th>
-                        <th className="px-5 py-3.5 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
+                  <>
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="w-full min-w-[900px] border-collapse text-left">
+                        <thead className="bg-[#f7f5f1] text-[11px] font-semibold uppercase tracking-[0.1em] text-[#6d665d]">
+                          <tr>
+                            <th className="px-5 py-3.5">Fiche</th>
+                            <th className="px-4 py-3.5">Formule</th>
+                            <th className="px-4 py-3.5">Secteur</th>
+                            <th className="px-4 py-3.5">Téléphone</th>
+                            <th className="px-4 py-3.5">WhatsApp</th>
+                            <th className="px-4 py-3.5">Échéance</th>
+                            <th className="px-5 py-3.5 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {pageData.items.map(fiche => (
+                            <tr
+                              key={fiche.id}
+                              className="transition hover:bg-transparent"
+                            >
+                              <td className="px-5 py-4">
+                                <div className="flex min-w-0 items-center gap-3">
+                                  {fiche.logo ? (
+                                    <img
+                                      src={fiche.logo}
+                                      alt={`Logo de ${fiche.prenom} ${fiche.nom}`}
+                                      className="h-10 w-10 shrink-0 rounded-xl border border-[#e3dfd8] object-cover"
+                                    />
+                                  ) : (
+                                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#08090A] text-xs font-bold tracking-wide text-white">
+                                      {initials(fiche.prenom, fiche.nom)}
+                                    </span>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="max-w-[200px] truncate text-sm font-semibold text-[#111111]">
+                                      {fiche.prenom} {fiche.nom}
+                                    </p>
+                                    <p className="mt-0.5 max-w-[200px] truncate text-xs text-[#8d8a85]">
+                                      {fiche.entreprise ||
+                                        fiche.fonction ||
+                                        "Fiche professionnelle"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <PlanPill plan={getPlan(fiche)} />
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[#6d665d]">
+                                {fiche.secteur
+                                  ? fiche.secteur.charAt(0) +
+                                    fiche.secteur.slice(1).toLowerCase()
+                                  : "—"}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[#6d665d]">
+                                {fiche.telephone || "—"}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[#6d665d]">
+                                {fiche.whatsapp || "—"}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[#6d665d]">
+                                <SubscriptionExpiry fiche={fiche} />
+                              </td>
+                              <td className="px-5 py-4 text-right">
+                                <div className="flex flex-col items-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPaymentFiche(fiche)}
+                                    className="whitespace-nowrap rounded-lg bg-[#08090A] px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#c9142b] focus:outline-none focus:ring-2 focus:ring-[#EF1733] focus:ring-offset-2"
+                                  >
+                                    {renewalInfo(fiche).expired ? (
+                                      "Renouveler"
+                                    ) : (
+                                      <>
+                                        Voir formule{" "}
+                                        <span aria-hidden="true">↗</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCardFiche(fiche)}
+                                    disabled={
+                                      fiche.statut !== "ACTIVE" ||
+                                      !getPlan(fiche)
+                                    }
+                                    title={
+                                      fiche.statut !== "ACTIVE" ||
+                                      !getPlan(fiche)
+                                        ? "Une fiche publiée avec un abonnement actif est nécessaire."
+                                        : undefined
+                                    }
+                                    className="whitespace-nowrap rounded-lg border border-[#e3dfd8] bg-white px-3.5 py-2 text-xs font-semibold text-[#25221e] transition hover:border-[#08090A] hover:bg-[#f7f5f1] disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Demander une carte
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="divide-y divide-slate-100 md:hidden">
                       {pageData.items.map(fiche => (
-                        <tr
-                          key={fiche.id}
-                          className="transition hover:bg-transparent"
-                        >
-                          <td className="px-5 py-4">
-                            <div className="flex min-w-0 items-center gap-3">
-                              {fiche.logo ? (
-                                <img
-                                  src={fiche.logo}
-                                  alt={`Logo de ${fiche.prenom} ${fiche.nom}`}
-                                  className="h-10 w-10 shrink-0 rounded-xl border border-[#e3dfd8] object-cover"
-                                />
-                              ) : (
-                                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#08090A] text-xs font-bold tracking-wide text-white">
-                                  {initials(fiche.prenom, fiche.nom)}
-                                </span>
-                              )}
-                              <div className="min-w-0">
-                                <p className="max-w-[200px] truncate text-sm font-semibold text-[#111111]">
-                                  {fiche.prenom} {fiche.nom}
-                                </p>
-                                <p className="mt-0.5 max-w-[200px] truncate text-xs text-[#8d8a85]">
-                                  {fiche.entreprise ||
-                                    fiche.fonction ||
-                                    "Fiche professionnelle"}
-                                </p>
+                        <article key={fiche.id} className="p-4">
+                          <div className="flex items-start gap-3">
+                            {fiche.logo ? (
+                              <img
+                                src={fiche.logo}
+                                alt={`Logo de ${fiche.prenom} ${fiche.nom}`}
+                                className="h-12 w-12 shrink-0 rounded-xl border border-[#e3dfd8] object-cover"
+                              />
+                            ) : (
+                              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#08090A] text-xs font-bold text-white">
+                                {initials(fiche.prenom, fiche.nom)}
+                              </span>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate text-sm font-semibold text-[#111111]">
+                                {fiche.prenom} {fiche.nom}
+                              </h3>
+                              <p className="mt-1 text-xs text-[#6d665d]">
+                                {fiche.secteur
+                                  ? fiche.secteur.charAt(0) +
+                                    fiche.secteur.slice(1).toLowerCase()
+                                  : "Secteur non renseigné"}
+                              </p>
+                              <div className="mt-2">
+                                <PlanPill plan={getPlan(fiche)} />
                               </div>
                             </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <PlanPill plan={getPlan(fiche)} />
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[#6d665d]">
-                            {fiche.secteur
-                              ? fiche.secteur.charAt(0) +
-                                fiche.secteur.slice(1).toLowerCase()
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[#6d665d]">
-                            {fiche.telephone || "—"}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[#6d665d]">
-                            {fiche.whatsapp || "—"}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[#6d665d]">
-                            <SubscriptionExpiry fiche={fiche} />
-                          </td>
-                          <td className="px-5 py-4 text-right">
-                            <div className="flex flex-col items-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setPaymentFiche(fiche)}
-                                className="whitespace-nowrap rounded-lg bg-[#08090A] px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#c9142b] focus:outline-none focus:ring-2 focus:ring-[#EF1733] focus:ring-offset-2"
-                              >
-                                {renewalInfo(fiche).expired ? (
-                                "Renouveler"
-                              ) : (
-                                <>
-                                  Voir formule <span aria-hidden="true">↗</span>
-                                </>
-                              )}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setCardFiche(fiche)}
-                                disabled={fiche.statut !== "ACTIVE" || !getPlan(fiche)}
-                                title={
-                                  fiche.statut !== "ACTIVE" || !getPlan(fiche)
-                                    ? "Une fiche publiée avec un abonnement actif est nécessaire."
-                                    : undefined
-                                }
-                                className="whitespace-nowrap rounded-lg border border-[#e3dfd8] bg-white px-3.5 py-2 text-xs font-semibold text-[#25221e] transition hover:border-[#08090A] hover:bg-[#f7f5f1] disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                Demander une carte
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="divide-y divide-slate-100 md:hidden">
-                  {pageData.items.map(fiche => (
-                    <article key={fiche.id} className="p-4">
-                      <div className="flex items-start gap-3">
-                        {fiche.logo ? (
-                          <img
-                            src={fiche.logo}
-                            alt={`Logo de ${fiche.prenom} ${fiche.nom}`}
-                            className="h-12 w-12 shrink-0 rounded-xl border border-[#e3dfd8] object-cover"
-                          />
-                        ) : (
-                          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#08090A] text-xs font-bold text-white">
-                            {initials(fiche.prenom, fiche.nom)}
-                          </span>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-sm font-semibold text-[#111111]">
-                            {fiche.prenom} {fiche.nom}
-                          </h3>
-                          <p className="mt-1 text-xs text-[#6d665d]">
-                            {fiche.secteur
-                              ? fiche.secteur.charAt(0) +
-                                fiche.secteur.slice(1).toLowerCase()
-                              : "Secteur non renseigné"}
-                          </p>
-                          <div className="mt-2">
-                            <PlanPill plan={getPlan(fiche)} />
                           </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[#f4f1eb] p-3">
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-medium uppercase tracking-wide text-[#8d8a85]">
-                            Téléphone
-                          </p>
-                          <p className="mt-1 break-words text-sm text-[#4a443c]">
-                            {fiche.telephone || "—"}
-                          </p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-medium uppercase tracking-wide text-[#8d8a85]">
-                            WhatsApp
-                          </p>
-                          <p className="mt-1 break-words text-sm text-[#4a443c]">
-                            {fiche.whatsapp || "—"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 rounded-xl bg-[#f4f1eb] px-3 py-2">
-                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8d8a85]">
-                          Échéance
-                        </p>
-                        <SubscriptionExpiry fiche={fiche} />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentFiche(fiche)}
-                        className="mt-3 w-full rounded-xl bg-[#08090A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#c9142b]"
-                      >
-                        {renewalInfo(fiche).expired ? (
-                                "Renouveler"
-                              ) : (
-                                <>
-                                  Voir formule <span aria-hidden="true">↗</span>
-                                </>
-                              )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCardFiche(fiche)}
-                        disabled={fiche.statut !== "ACTIVE" || !getPlan(fiche)}
-                        className="mt-2 w-full rounded-xl border border-[#e3dfd8] bg-white px-4 py-3 text-sm font-semibold text-[#25221e] transition hover:border-[#08090A] hover:bg-[#f7f5f1] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Demander une carte
-                      </button>
-                    </article>
-                  ))}
-                </div>
-                </>
+                          <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[#f4f1eb] p-3">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium uppercase tracking-wide text-[#8d8a85]">
+                                Téléphone
+                              </p>
+                              <p className="mt-1 break-words text-sm text-[#4a443c]">
+                                {fiche.telephone || "—"}
+                              </p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium uppercase tracking-wide text-[#8d8a85]">
+                                WhatsApp
+                              </p>
+                              <p className="mt-1 break-words text-sm text-[#4a443c]">
+                                {fiche.whatsapp || "—"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-3 rounded-xl bg-[#f4f1eb] px-3 py-2">
+                            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8d8a85]">
+                              Échéance
+                            </p>
+                            <SubscriptionExpiry fiche={fiche} />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentFiche(fiche)}
+                            className="mt-3 w-full rounded-xl bg-[#08090A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#c9142b]"
+                          >
+                            {renewalInfo(fiche).expired ? (
+                              "Renouveler"
+                            ) : (
+                              <>
+                                Voir formule <span aria-hidden="true">↗</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCardFiche(fiche)}
+                            disabled={
+                              fiche.statut !== "ACTIVE" || !getPlan(fiche)
+                            }
+                            className="mt-2 w-full rounded-xl border border-[#e3dfd8] bg-white px-4 py-3 text-sm font-semibold text-[#25221e] transition hover:border-[#08090A] hover:bg-[#f7f5f1] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Demander une carte
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  </>
                 )}
                 <FichePagination
                   currentPage={pageData.currentPage}
