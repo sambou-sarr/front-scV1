@@ -1,11 +1,10 @@
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { isAuthFailure } from "../../../lib/apiError";
+import { isAuthFailure, toApiError } from "../../../lib/apiError";
 import { clearSession } from "../../../lib/session";
 import "../../../styles/dashboard.css";
-import { deleteFiche } from "../espaceClient.service";
+import { deleteFiche, setFicheDraft } from "../espaceClient.service";
 import {
   dashboardFichesKey,
   useDashboardFiches,
@@ -38,9 +37,7 @@ interface Props {
   onView: (slug: string) => void;
 }
 
-type Fiche = NonNullable<
-  ReturnType<typeof useDashboardFiches>["data"]
->[number];
+type Fiche = NonNullable<ReturnType<typeof useDashboardFiches>["data"]>[number];
 
 const PILL: Record<
   Health,
@@ -118,16 +115,35 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
     },
   });
 
+  const draftMutation = useMutation({
+    mutationKey: ["setFicheDraft"],
+    mutationFn: (ficheId: number) => setFicheDraft(ficheId),
+
+    onSuccess: async () => {
+      setFicheToDelete(null);
+
+      await queryClient.invalidateQueries({
+        queryKey: dashboardFichesKey,
+      });
+    },
+  });
+
   const handleDelete = (fiche: Fiche) => {
     deleteMutation.reset();
+    draftMutation.reset();
     setFicheToDelete(fiche);
   };
 
   const confirmDelete = () => {
-    if (!ficheToDelete || deleteMutation.isPending) return;
+    if (!ficheToDelete || deleteMutation.isPending || draftMutation.isPending) {
+      return;
+    }
 
     deleteMutation.mutate(ficheToDelete.id);
+    draftMutation.mutate(ficheToDelete.id);
   };
+
+  // console.log(draftMutation.error?.message);
 
   const handleCreated = () => {
     setCreateOpen(false);
@@ -139,13 +155,12 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
   // Priorité à l'abonnement le plus récent fourni par l'API.
   // Sinon, on recherche un abonnement actif dans la liste.
   const selectedSubscription = ficheToDelete
-    ? ficheToDelete.latestSubscription ??
+    ? (ficheToDelete.latestSubscription ??
       ficheToDelete.subscriptions?.find(s => s.status === "ACTIVE") ??
-      ficheToDelete.subscriptions?.[0]
+      ficheToDelete.subscriptions?.[0])
     : undefined;
 
-  const hasActiveSubscription =
-    selectedSubscription?.status === "ACTIVE";
+  const hasActiveSubscription = selectedSubscription?.status === "ACTIVE";
 
   const createDialog = createOpen ? (
     <div
@@ -198,9 +213,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
       <div className="db">
         <div className="db-state" role="alert">
           <h2>
-            {expired
-              ? "Session expirée"
-              : "Impossible de charger vos fiches"}
+            {expired ? "Session expirée" : "Impossible de charger vos fiches"}
           </h2>
 
           <p>
@@ -237,10 +250,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
             personnaliser.
           </p>
 
-          <button
-            className="db-create-btn"
-            onClick={() => setCreateOpen(true)}
-          >
+          <button className="db-create-btn" onClick={() => setCreateOpen(true)}>
             + Créer ma fiche
           </button>
         </div>
@@ -250,8 +260,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
     );
   }
 
-  const cur =
-    pageData.items.find(f => f.slug === sel) ?? pageData.items[0];
+  const cur = pageData.items.find(f => f.slug === sel) ?? pageData.items[0];
 
   const url = cur ? publicUrl(cur.slug) : "";
   const missing = cur ? checks(cur).filter(c => !c.ok) : [];
@@ -264,8 +273,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
   );
 
   const last = fiches.reduce(
-    (latest, fiche) =>
-      fiche.updatedAt > latest ? fiche.updatedAt : latest,
+    (latest, fiche) => (fiche.updatedAt > latest ? fiche.updatedAt : latest),
     fiches[0].updatedAt
   );
 
@@ -276,15 +284,10 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           <div>
             <p className="db-k">Espace client</p>
             <h1>Bonjour {user.name.split(" ")[0]}</h1>
-            <p className="db-sub">
-              Voici l’état de vos fiches connectées.
-            </p>
+            <p className="db-sub">Voici l’état de vos fiches connectées.</p>
           </div>
 
-          <button
-            className="db-create-btn"
-            onClick={() => setCreateOpen(true)}
-          >
+          <button className="db-create-btn" onClick={() => setCreateOpen(true)}>
             + Créer une fiche
           </button>
         </div>
@@ -295,10 +298,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           {alerts.map(fiche => (
             <li key={fiche.id} className={PILL[health(fiche)].cls}>
               <b>{displayName(fiche)}</b> —{" "}
-              {PILL[health(fiche)].text(
-                daysLeft(subscriptionEndsAt(fiche))
-              )}
-              .{" "}
+              {PILL[health(fiche)].text(daysLeft(subscriptionEndsAt(fiche)))}.{" "}
               {health(fiche) === "expired" ? (
                 <Link to={renewPath(fiche.id)}>Renouveler</Link>
               ) : (
@@ -339,10 +339,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
         <section aria-label="Mes fiches">
           <h2>Mes fiches</h2>
 
-          <FicheListControls
-            filters={filters}
-            onChange={updateFilters}
-          />
+          <FicheListControls filters={filters} onChange={updateFilters} />
 
           {pageData.items.length === 0 ? (
             <div className="db-state">
@@ -350,9 +347,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
 
               <button
                 className="db-copy"
-                onClick={() =>
-                  updateFilters(DEFAULT_FICHE_LIST_FILTERS)
-                }
+                onClick={() => updateFilters(DEFAULT_FICHE_LIST_FILTERS)}
               >
                 Effacer les filtres
               </button>
@@ -364,8 +359,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                 const c = completion(fiche);
 
                 const subscription =
-                  fiche.subscriptions?.[0] ??
-                  fiche.abonnementActif;
+                  fiche.subscriptions?.[0] ?? fiche.abonnementActif;
 
                 return (
                   <li
@@ -399,24 +393,18 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
 
                     <div className="db-row">
                       <span className={`db-pill ${PILL[h].cls}`}>
-                        {PILL[h].text(
-                          daysLeft(subscriptionEndsAt(fiche))
-                        )}
+                        {PILL[h].text(daysLeft(subscriptionEndsAt(fiche)))}
                       </span>
 
                       {subscription && (
                         <span className="db-plan">
-                          {subscription.plan?.nom ??
-                            subscription.plan?.type}
+                          {subscription.plan?.nom ?? subscription.plan?.type}
                         </span>
                       )}
 
-                      {fiche.enLigneSeule &&
-                        !subscription && (
-                          <span className="db-plan free">
-                            Créée gratuitement
-                          </span>
-                        )}
+                      {fiche.enLigneSeule && !subscription && (
+                        <span className="db-plan free">Créée gratuitement</span>
+                      )}
 
                       <span className="db-scans">
                         <b>{fiche.scansTotal}</b> passage
@@ -424,9 +412,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                       </span>
 
                       <span className="db-act">
-                        <button onClick={() => onView(fiche.slug)}>
-                          Voir
-                        </button>
+                        <button onClick={() => onView(fiche.slug)}>Voir</button>
 
                         {h === "expired" && (
                           <Link
@@ -466,10 +452,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                       </span>
                     </div>
 
-                    <div
-                      className="db-comp"
-                      title={`Fiche complète à ${c} %`}
-                    >
+                    <div className="db-comp" title={`Fiche complète à ${c} %`}>
                       <i>
                         <u style={{ width: `${c}%` }} />
                       </i>
@@ -507,23 +490,15 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
 
               <ul className="db-todo">
                 {checks(cur).map(check => (
-                  <li
-                    key={check.key}
-                    className={check.ok ? "ok" : ""}
-                  >
-                    <span aria-hidden="true">
-                      {check.ok ? "✓" : ""}
-                    </span>
+                  <li key={check.key} className={check.ok ? "ok" : ""}>
+                    <span aria-hidden="true">{check.ok ? "✓" : ""}</span>
                     {check.label}
                   </li>
                 ))}
               </ul>
 
               {pc < 100 && (
-                <button
-                  className="db-copy pri"
-                  onClick={() => onEdit(cur.id)}
-                >
+                <button className="db-copy pri" onClick={() => onEdit(cur.id)}>
                   Compléter ma fiche
                 </button>
               )}
@@ -559,13 +534,9 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
               !
             </div>
 
-            <h2 id="db-delete-title">
-              Supprimer cette fiche ?
-            </h2>
+            <h2 id="db-delete-title">Supprimer cette fiche ?</h2>
 
-            <p className="db-delete-name">
-              {displayName(ficheToDelete)}
-            </p>
+            <p className="db-delete-name">{displayName(ficheToDelete)}</p>
 
             {hasActiveSubscription ? (
               <div className="db-delete-warning">
@@ -583,36 +554,26 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                 </p>
 
                 <p>
-                  La suppression de la fiche peut affecter
-                  l’accès au service associé. Vérifiez les
-                  conséquences sur l’abonnement avant de continuer.
-                  La suppression ne garantit pas sa résiliation.
+                  La suppression de la fiche peut affecter l’accès au service
+                  associé. Vérifiez les conséquences sur l’abonnement avant de
+                  continuer.
                 </p>
               </div>
             ) : (
               <p id="db-delete-description">
-                Voulez-vous vraiment supprimer cette fiche ?
-                Cette action peut être définitive.
+                Voulez-vous vraiment supprimer cette fiche ? Cette action peut
+                être définitive.
               </p>
             )}
-
-            {deleteMutation.isError && (
+            {(deleteMutation.isError || draftMutation.isError) && (
               <div className="db-delete-error" role="alert">
-                {isAuthFailure(deleteMutation.error)
-                  ? "Votre session a expiré. Reconnectez-vous avant de réessayer."
-                  : "La suppression a échoué. Vérifiez votre connexion et réessayez."}
-
-                {isAuthFailure(deleteMutation.error) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFicheToDelete(null);
-                      clearSession();
-                    }}
-                  >
-                    Se connecter
-                  </button>
-                )}
+                {
+                  toApiError(
+                    draftMutation.isError
+                      ? draftMutation.error
+                      : deleteMutation.error
+                  ).message
+                }
               </div>
             )}
 
@@ -623,21 +584,42 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                 onClick={() => {
                   setFicheToDelete(null);
                   deleteMutation.reset();
+                  draftMutation.reset();
                 }}
-                disabled={deleteMutation.isPending}
+                disabled={deleteMutation.isPending || draftMutation.isPending}
               >
                 Annuler
               </button>
 
               <button
                 type="button"
+                onClick={() => {
+                  if (
+                    !ficheToDelete ||
+                    deleteMutation.isPending ||
+                    draftMutation.isPending
+                  ) {
+                    return;
+                  }
+
+                  draftMutation.mutate(ficheToDelete.id);
+                }}
+                disabled={deleteMutation.isPending || draftMutation.isPending}
+              >
+                {draftMutation.isPending
+                  ? "Mise en brouillon…"
+                  : "Mettre en brouillon"}
+              </button>
+
+              <button
+                type="button"
                 className="db-delete-confirm"
                 onClick={confirmDelete}
-                disabled={deleteMutation.isPending}
+                disabled={deleteMutation.isPending || draftMutation.isPending}
               >
                 {deleteMutation.isPending
                   ? "Suppression…"
-                  : "Confirmer la suppression"}
+                  : "Supprimer définitivement"}
               </button>
             </div>
           </section>

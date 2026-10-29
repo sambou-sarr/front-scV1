@@ -301,3 +301,8 @@ export async function deleteFiche(id: number) {
   const result = await api.delete(`/fiches/${id}`);
   return result.data;
 }
+
+export async function setFicheDraft(id: number) {
+  const result = await api.patch(`/fiches/draft-fiche/${id}`);
+  return result.data;
+}
