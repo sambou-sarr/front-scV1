@@ -115,13 +115,23 @@ export default function ClientLayout({ children }: { children?: ReactNode }) {
         id="cl-nav"
         aria-label="Navigation de l’espace client"
       >
-        <div className="cl-top">
-          <span className="cl-brand">
-            <img src="/images/symbole-s.webp" alt="" width="34" height="34" />
-            <span>
-              Support Connecté<small>Espace client</small>
+        <div className="flex items-center gap-3 px-4 py-4">
+          <img
+            src="/images/logo-vertical-blanc.webp"
+            alt="Logo Support Connecté"
+            width={34}
+            height={34}
+            className="h-[34px] w-[34px] shrink-0 object-contain"
+          />
+
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold leading-tight text-white">
+              Support Connecté
             </span>
-          </span>
+            <small className="mt-1 text-xs leading-tight text-gray-400">
+              Espace client
+            </small>
+          </div>
         </div>
         <nav aria-label="Principal">
           <ul className="cl-nav">

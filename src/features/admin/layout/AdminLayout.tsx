@@ -43,11 +43,22 @@ export default function AdminLayout({ children }: { children?: ReactNode }) {
     <div className="adm">
       <div className="app">
         <aside className={`side${open ? " open" : ""}`}>
-          <div className="brand">
-            <span className="logo">S</span>
-            <div>
-              <b>SUPPORT</b>
-              <small>CONNECTÉ · Back-office</small>
+          <div className="flex items-center gap-3 px-4 py-4">
+            <img
+              src="/images/logo-vertical-blanc.webp"
+              alt="Logo Support Connecté"
+              width={34}
+              height={34}
+              className="h-[34px] w-[34px] shrink-0 object-contain"
+            />
+
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold leading-tight text-white">
+                Support Connecté
+              </span>
+              <small className="mt-1 text-xs leading-tight text-gray-400">
+                Back-office
+              </small>
             </div>
           </div>
           <nav aria-label="Principal">
