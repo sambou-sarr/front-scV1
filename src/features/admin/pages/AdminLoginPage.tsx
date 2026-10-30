@@ -2,9 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import "../../../styles/admin.css";
 import { AFTER_ADMIN_LOGIN } from "../../../data/auth";
 import { useSession } from "../../../lib/session";
+import "../../../styles/admin.css";
 import { safePath } from "../../../utils/auth";
 import { adminLogin } from "../../auth/auth.service";
 
@@ -35,14 +35,21 @@ export default function AdminLoginPage() {
   };
 
   const message = isError ? error.message : (state?.notice ?? "");
-
   return (
     <div className="adm">
       <div className="login">
         <form onSubmit={submit}>
-          <span className="logo lg">S</span>
-          <h1>Back-office</h1>
-          <p>Accès réservé aux administrateurs.</p>
+          {/* Logo */}
+          <div className="flex items-center justify-center py-4">
+            <img
+              src="/images/Logo.png"
+              alt="Logo Support Connecté"
+              width={54}
+              height={54}
+              className="h-[54px] w-[54px] object-contain"
+            />
+          </div>
+    
           <input
             type="email"
             required
@@ -51,6 +58,7 @@ export default function AdminLoginPage() {
             value={email}
             onChange={e => setEmail(e.target.value)}
           />
+
           <input
             type="password"
             required
@@ -59,6 +67,7 @@ export default function AdminLoginPage() {
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
+
           <button
             className="adm-btn adm-btn-red"
             type="submit"
@@ -66,6 +75,7 @@ export default function AdminLoginPage() {
           >
             {isPending ? "Connexion…" : "Se connecter"}
           </button>
+
           {message && (
             <small className="err" role="alert">
               {message}
