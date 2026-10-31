@@ -13,7 +13,7 @@ import { initials, wa } from "./fiche/format";
 import { usePullQR } from "./fiche/usePullQR";
 
 /*
-  Fiche connectée V2 (page publique ouverte par la carte NFC / le QR).
+  Fiche (page publique ouverte par la carte NFC / le QR).
   - Onglets pliables, dans l'ordre et selon les droits de la formule (lib/plans.ts).
   - Entête modulable en Signature : portrait, logo, bannière, duo · 3 tailles · 4 thèmes.
   - « Tirer pour le QR » : en haut de page, on tire vers le bas → la photo remonte et le QR code
@@ -26,7 +26,6 @@ interface FicheProps {
   fiche: FicheRecord;
   scrollerRef?: RefObject<HTMLDivElement>;
   baseUrl?: string;
-  /** Affiche le QR code, le bouton « NFC · QR » et active le geste « tirer pour le QR ». Réservé au propriétaire. */
   ownerTools?: boolean;
 }
 interface Action {

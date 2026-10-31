@@ -49,7 +49,9 @@ export default function AdminLoginPage() {
               className="h-[54px] w-[54px] object-contain"
             />
           </div>
-    
+
+          <h1>Back-office</h1>
+
           <input
             type="email"
             required
