@@ -1,0 +1,2247 @@
+From c7aeecbee8833e786b5452d33ceb7d7376a75178 Mon Sep 17 00:00:00 2001
+From: Claude <claude@users.noreply.anthropic.com>
+Date: Sun, 1 Nov 2026 13:06:12 +0000
+Subject: [PATCH] =?UTF-8?q?feat(stickers):=20demande=20de=20devis=20par=20?=
+ =?UTF-8?q?section=20c=C3=B4t=C3=A9=20client,=20activation=20et=20aper?=
+ =?UTF-8?q?=C3=A7u=20c=C3=B4t=C3=A9=20administration?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- client : le bloc « Stickers par section » demande un devis (nombre de stickers) ; lien, QR, aperçu et « Ouvrir »
+  n'apparaissent qu'une fois la section activée par l'administration
+- public : seule une section activée est servie en /s/:slug/:section (fiche.stickerSections), sinon fiche complète ;
+  preview lève l'exigence pour l'aperçu
+- admin : onglet « Stickers par section » dans Production (demandes, aperçu, activer / refuser / désactiver) et
+  panneau « Aperçu et stickers par section » avec mini téléphone dans /admin/fiches/:id
+- PhonePreview : mini téléphone partagé (aperçu de fiche, éditeur, administration)
+- tests de mes outils du propriétaire : attendent le chargeur de 1 s de la page publique (échouaient sur develop)
+- tests (≈ 55) et READMEs
+---
+ src/features/admin/README.md                  |  17 +
+ src/features/admin/admin.service.ts           |   6 +
+ src/features/admin/adminPages.test.tsx        |   1 +
+ .../admin/components/SectionStickers.test.tsx | 377 ++++++++++++++++++
+ .../admin/components/SectionStickers.tsx      | 294 ++++++++++++++
+ src/features/admin/lib/sectionStickers.ts     |  44 ++
+ src/features/admin/pages/FicheDetail.tsx      |   3 +
+ src/features/admin/pages/Production.tsx       |   9 +-
+ src/features/espace-client/README.md          |  28 +-
+ .../espace-client/components/Editor.css       |  12 +
+ .../espace-client/components/PhonePreview.tsx |  23 ++
+ .../editor/sections/StickerBox.test.tsx       | 318 +++++++++++++++
+ .../components/editor/sections/StickerBox.tsx | 222 +++++++++--
+ .../components/ownerTools.test.tsx            |  13 +-
+ .../components/signatureTemplate.test.tsx     |  15 +-
+ .../components/sticker/StickerSection.css     |   3 +
+ .../components/sticker/StickerSectionView.tsx |  10 +-
+ .../components/sticker/sticker.test.tsx       |  92 ++---
+ .../espace-client/components/tabs.test.tsx    |  10 +-
+ .../espace-client/espaceClient.service.ts     |  22 +-
+ src/features/espace-client/lib/ficheApi.ts    |   1 +
+ .../espace-client/lib/stickerSections.test.ts |  52 ++-
+ .../espace-client/lib/stickerSections.ts      |  53 ++-
+ .../espace-client/pages/EditorPage.tsx        |   1 +
+ .../espace-client/pages/FichePage.tsx         |  26 +-
+ src/styles/admin.css                          |   8 +
+ src/types/admin.ts                            |   8 +
+ src/types/api.ts                              |  17 +
+ src/types/fiche.ts                            |   2 +
+ 29 files changed, 1545 insertions(+), 142 deletions(-)
+ create mode 100644 src/features/admin/components/SectionStickers.test.tsx
+ create mode 100644 src/features/admin/components/SectionStickers.tsx
+ create mode 100644 src/features/admin/lib/sectionStickers.ts
+ create mode 100644 src/features/espace-client/components/PhonePreview.tsx
+ create mode 100644 src/features/espace-client/components/editor/sections/StickerBox.test.tsx
+
+diff --git a/src/features/admin/README.md b/src/features/admin/README.md
+index 8973289..dcb08ed 100644
+--- a/src/features/admin/README.md
++++ b/src/features/admin/README.md
+@@ -34,3 +34,20 @@ lien https restent affichés et peuvent être remplacés par un fichier.
+ - API : `adminApi.listModelesCartes / createModeleCarte / updateModeleCarte / deleteModeleCarte`
+   (`/admin/production/modeles-cartes`) ; `uploadCardImage(file)` envoie le fichier en binaire (`/images`) et renvoie son adresse.
+ - Côté client, `CardRequestPanel` lit `modele` dans `GET /fiches/:id/card-request` (voir `espace-client/README.md`).
++
++## Stickers par section (demandes de devis)
++
++Le client demande un devis pour un nombre de stickers ouvrant une section de sa fiche ; l'administration **active la
++section** (c'est seulement alors qu'elle est servie au public et que le client reçoit lien et QR).
++
++- **Production › « Stickers par section »** : toutes les demandes (filtre « À traiter » par défaut) : fiche, section, nombre,
++  client, date, état. Actions : Aperçu, Activer la section, Refuser, Désactiver, Réactiver (mêmes transitions que le serveur :
++  `demande → active | refusée`, `active → désactivée`, `désactivée → active`). L'onglet gère lui-même son chargement :
++  une API pas à jour ne bloque pas le reste de la page.
++- **`/admin/fiches/:id`** : panneau « Aperçu et stickers par section » : mini téléphone (le même composant `PhonePreview` que
++  `/fiche/preview/:id`) montrant la fiche, ou une section demandée (aperçu : elle n'a pas besoin d'être activée), et les
++  demandes de cette fiche avec leurs décisions.
++- API : `adminApi.listSectionStickers({ statut?, ficheId? })`, `adminApi.setSectionStickerStatus(id, statut)`
++  (`/admin/production/section-stickers`). La fiche de l'aperçu est lue par `fiches/:id` avec la session administrateur.
++- À vérifier à l'œil : la feuille `admin.css` contient quelques règles génériques (`.adm a`, champs de formulaire) qui
++  s'appliquent aussi à la fiche affichée dans le téléphone ; elles ne devraient pas la déformer mais n'ont pas été contrôlées visuellement.
+diff --git a/src/features/admin/admin.service.ts b/src/features/admin/admin.service.ts
+index c71d49c..ad29365 100644
+--- a/src/features/admin/admin.service.ts
++++ b/src/features/admin/admin.service.ts
+@@ -22,6 +22,7 @@ import type {
+   PatchEmplacements,
+   PatchFormule,
+   PatchModeleCarteInput,
++  SectionStickerAdmin,
+   ProductionSummary,
+   QrApercu,
+   QrFormat,
+@@ -182,6 +183,11 @@ export const adminApi = {
+       versoUrl?: string | null;
+     },
+   ) => patch<{ carte: Carte }>(`/admin/production/cartes/${id}`, b),
++  // Stickers « par section » : demandes de devis des clients ; activer une demande ouvre la section en page publique
++  listSectionStickers: (q: { statut?: SectionStickerAdmin["statut"]; ficheId?: number } = {}) =>
++    get<{ demandes: SectionStickerAdmin[] }>("/admin/production/section-stickers", q),
++  setSectionStickerStatus: (id: number, statut: "active" | "desactivee" | "refusee") =>
++    patch<{ demande: SectionStickerAdmin }>(`/admin/production/section-stickers/${id}`, { statut }),
+   // Modèles de carte (recto / verso affichés au client dans sa demande de carte)
+   listModelesCartes: () =>
+     get<{ modeles: ModeleCarte[] }>("/admin/production/modeles-cartes"),
+diff --git a/src/features/admin/adminPages.test.tsx b/src/features/admin/adminPages.test.tsx
+index 2319daa..b765079 100644
+--- a/src/features/admin/adminPages.test.tsx
++++ b/src/features/admin/adminPages.test.tsx
+@@ -82,6 +82,7 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
+     code: "qr-code-1", url: "https://sc.example/q/qr-code-1", label: "Menu du restaurant",
+     targetUrl: null, actif: true, scans: 0, lastScanAt: null, sticker: null,
+   }] };
++  if (url === "/admin/production/section-stickers") return { demandes: [] };
+   if (url === "/admin/qrcodes/styles") return { styles: [] };
+   if (url === "/admin/relances") {
+     const type = (c.params as Record<string, string> | undefined)?.type;
+diff --git a/src/features/admin/components/SectionStickers.test.tsx b/src/features/admin/components/SectionStickers.test.tsx
+new file mode 100644
+index 0000000..6c00897
+--- /dev/null
++++ b/src/features/admin/components/SectionStickers.test.tsx
+@@ -0,0 +1,377 @@
++// @vitest-environment jsdom
++import { AxiosError } from "axios";
++import { act, createElement as h } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { MemoryRouter } from "react-router-dom";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { api } from "../../../lib/api";
++import { TAB_TYPES } from "../../../lib/plans";
++import { FICHES } from "../../../test/fixtures/fiches";
++import type { SectionStickerAdmin } from "../../../types/admin";
++import { FichePreviewPanel, SectionStickersTab } from "./SectionStickers";
++import { ToastProvider } from "./ui";
++
++(
++  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++/*
++  Stickers par section, côté administration : traiter les demandes de devis des clients, activer la section,
++  aperçu de ce que verra la personne qui scanne, et mini téléphone dans la fiche détail.
++*/
++const fixture = FICHES.find(f => f.slug === "le-sunset")!; // Signature, restaurant
++const demande = (
++  over: Partial<SectionStickerAdmin> = {},
++): SectionStickerAdmin => ({
++  id: 1,
++  section: "menu",
++  quantite: 20,
++  message: null,
++  statut: "demande",
++  createdAt: "2026-10-29T10:00:00Z",
++  activatedAt: null,
++  updatedAt: "2026-10-29T10:00:00Z",
++  fiche: {
++    id: 12,
++    slug: "le-sunset",
++    prenom: "Rose",
++    nom: "Ndiaye",
++    entreprise: "Le Sunset",
++  },
++  client: { id: 7, nom: "Rose", email: "rose@exemple.sn" },
++  ...over,
++});
++
++describe("stickers par section (administration)", () => {
++  const original = api.defaults.adapter;
++  let store: SectionStickerAdmin[];
++  let calls: {
++    method?: string;
++    url?: string;
++    params?: Record<string, unknown>;
++    body?: Record<string, unknown>;
++  }[];
++  let failFiche = false;
++  let failPatch: string | null = null;
++  let failList = false;
++  let root: Root;
++  let host: HTMLDivElement;
++
++  beforeEach(() => {
++    store = [];
++    calls = [];
++    failFiche = false;
++    failPatch = null;
++    failList = false;
++    host = document.createElement("div");
++    document.body.appendChild(host);
++    root = createRoot(host);
++    api.defaults.adapter = async config => {
++      const url = (config.url ?? "").replace(/^\//, "");
++      const body =
++        typeof config.data === "string" ? JSON.parse(config.data) : undefined;
++      calls.push({ method: config.method, url, params: config.params, body });
++      const mk = (data: unknown, status = 200) => ({
++        status,
++        data,
++        statusText: "",
++        headers: {},
++        config,
++      });
++      const fail = (message: string, status: number) =>
++        new AxiosError(
++          "fail",
++          String(status),
++          config,
++          undefined,
++          mk({ error: { message } }, status),
++        );
++      if (
++        url === "admin/production/section-stickers" &&
++        config.method === "get"
++      ) {
++        if (failList) throw fail("Liste indisponible", 500);
++        const id = config.params?.ficheId as number | undefined;
++        return mk({
++          demandes: id ? store.filter(d => d.fiche.id === id) : store,
++        });
++      }
++      if (
++        /^admin\/production\/section-stickers\/\d+$/.test(url) &&
++        config.method === "patch"
++      ) {
++        if (failPatch) throw fail(failPatch, 409);
++        const id = Number(url.split("/").pop());
++        store = store.map(d =>
++          d.id === id
++            ? { ...d, statut: body!.statut as SectionStickerAdmin["statut"] }
++            : d,
++        );
++        return mk({ demande: store.find(d => d.id === id) });
++      }
++      if (url === "fiches/12" && config.method === "get") {
++        if (failFiche) throw fail("Fiche indisponible", 500);
++        return mk({
++          fiche: {
++            ...fixture,
++            id: 12,
++            formule: fixture.formule.toUpperCase(),
++            statut: fixture.statut.toUpperCase(),
++            stickerSections: [],
++          },
++        });
++      }
++      return mk({});
++    };
++  });
++  afterEach(() => {
++    api.defaults.adapter = original;
++    act(() => root.unmount());
++    host.remove();
++  });
++
++  const settle = async () => {
++    for (let i = 0; i < 8; i++)
++      await act(async () => void (await new Promise(r => setTimeout(r, 0))));
++  };
++  const wrap = (el: ReturnType<typeof h>) =>
++    h(ToastProvider, null, h(MemoryRouter, null, el));
++  const mount = async (el: ReturnType<typeof h>) => {
++    await act(async () => root.render(wrap(el)));
++    await settle();
++  };
++  const btn = (scope: ParentNode, label: string) =>
++    [...scope.querySelectorAll("button")].find(
++      b => b.textContent?.trim() === label,
++    ) as HTMLButtonElement | undefined;
++  const click = async (el: HTMLElement) => {
++    await act(async () => el.click());
++    await settle();
++  };
++  const dialog = () =>
++    document.body.querySelector<HTMLElement>('[role="dialog"]');
++  const patches = () => calls.filter(c => c.method === "patch");
++
++  describe("onglet « Stickers par section » (Production)", () => {
++    const all = () => [
++      demande({ id: 1, statut: "demande" }),
++      demande({ id: 2, statut: "active", section: "horaires", quantite: 5 }),
++      demande({ id: 3, statut: "desactivee", section: "avis" }),
++      demande({ id: 4, statut: "refusee", section: "galerie" }),
++    ];
++    const tab = (
++      extra: Partial<Parameters<typeof SectionStickersTab>[0]> = {},
++    ) =>
++      h(SectionStickersTab, {
++        data: all(),
++        error: null,
++        onChanged: () => {},
++        ...extra,
++      });
++
++    it("n'affiche d'abord que les demandes À TRAITER, avec fiche, section, nombre et client", async () => {
++      await mount(tab());
++      const rows = host.querySelectorAll("tbody tr");
++      expect(rows).toHaveLength(1);
++      const text = rows[0].textContent ?? "";
++      expect(text).toContain("Le Sunset");
++      expect(text).toContain("/le-sunset");
++      expect(text).toContain("Menu");
++      expect(text).toContain("20");
++      expect(text).toContain("rose@exemple.sn");
++      expect(text).toContain("À traiter");
++      expect(rows[0].querySelector("a")?.getAttribute("href")).toBe(
++        "/admin/fiches/12",
++      );
++    });
++
++    it("les filtres montrent les demandes activées, puis toutes", async () => {
++      await mount(tab());
++      await click(btn(host, "Activées")!);
++      expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
++      expect(host.textContent).toContain("Activée");
++      await click(btn(host, "Toutes")!);
++      expect(host.querySelectorAll("tbody tr")).toHaveLength(4);
++    });
++
++    it("propose les bonnes décisions selon l'état de la demande", async () => {
++      await mount(tab());
++      await click(btn(host, "Toutes")!);
++      const labels = (i: number) =>
++        [
++          ...host.querySelectorAll("tbody tr")[i].querySelectorAll("button"),
++        ].map(b => b.textContent);
++      expect(labels(0)).toEqual(["Aperçu", "Activer la section", "Refuser"]); // à traiter
++      expect(labels(1)).toEqual(["Aperçu", "Désactiver"]); // activée
++      expect(labels(2)).toEqual(["Aperçu", "Réactiver"]); // désactivée
++      expect(labels(3)).toEqual(["Aperçu"]); // refusée : plus rien à décider
++    });
++
++    it("« Activer la section » envoie la décision, prévient l'administrateur et recharge", async () => {
++      store = all();
++      const onChanged = vi.fn();
++      await mount(tab({ onChanged }));
++      await click(btn(host, "Activer la section")!);
++      expect(patches()).toHaveLength(1);
++      expect(patches()[0]).toMatchObject({
++        url: "admin/production/section-stickers/1",
++        body: { statut: "active" },
++      });
++      expect(document.body.textContent).toContain(
++        "le client voit maintenant son lien et son QR",
++      );
++      expect(onChanged).toHaveBeenCalledTimes(1);
++    });
++
++    it("refuser et désactiver envoient la bonne décision", async () => {
++      store = all();
++      await mount(tab());
++      await click(btn(host, "Refuser")!);
++      expect(patches()[0].body).toEqual({ statut: "refusee" });
++      await click(btn(host, "Toutes")!);
++      await click(
++        [
++          ...host.querySelectorAll("tbody tr")[1].querySelectorAll("button"),
++        ].find(b => b.textContent === "Désactiver")!,
++      );
++      expect(patches()[1]).toMatchObject({
++        url: "admin/production/section-stickers/2",
++        body: { statut: "desactivee" },
++      });
++    });
++
++    it("une décision refusée par le serveur affiche l'erreur et ne recharge pas", async () => {
++      store = all();
++      failPatch =
++        "Une autre demande est déjà ouverte pour cette section de la fiche.";
++      const onChanged = vi.fn();
++      await mount(tab({ onChanged }));
++      await click(btn(host, "Activer la section")!);
++      expect(document.body.textContent).toContain(
++        "Une autre demande est déjà ouverte",
++      );
++      expect(onChanged).not.toHaveBeenCalled();
++    });
++
++    it("« Aperçu » ouvre ce que verra la personne qui scanne, même si la section n'est pas activée", async () => {
++      await mount(tab());
++      await click(btn(host, "Aperçu")!);
++      expect(dialog()).toBeTruthy();
++      expect(dialog()!.getAttribute("aria-label")).toContain("Menu");
++      expect(calls.some(c => c.url === "fiches/12")).toBe(true); // la fiche est lue avec la session de l'administrateur
++      expect(dialog()!.querySelector(".fiche-preview-device")).toBeTruthy(); // mini téléphone
++      expect(dialog()!.querySelector(".ss-head")).toBeTruthy(); // en-tête logo + nom de la page sticker
++      expect(dialog()!.textContent).toContain("Voir la fiche complète"); // bouton vers la fiche complète
++      expect(dialog()!.querySelector(".f-hero")).toBeNull(); // pas la fiche entière
++      await click(
++        btn(dialog()!, "Fermer") ??
++          dialog()!.querySelector<HTMLElement>("button")!,
++      );
++    });
++
++    it("aucune demande à traiter : message clair", async () => {
++      await mount(tab({ data: [demande({ statut: "active" })] }));
++      expect(host.textContent).toContain("Aucune demande à traiter");
++    });
++
++    it("erreur de chargement : message et nouvel essai ; chargement en cours sans erreur", async () => {
++      const onChanged = vi.fn();
++      await mount(tab({ data: null, error: "Liste indisponible", onChanged }));
++      expect(host.textContent).toContain("Liste indisponible");
++      await click(btn(host, "Réessayer")!);
++      expect(onChanged).toHaveBeenCalled();
++      await mount(tab({ data: null, error: null }));
++      expect(host.textContent).not.toContain("Liste indisponible");
++      expect(host.querySelector("table")).toBeNull();
++    });
++  });
++
++  describe("fiche détail (/admin/fiches/:id) : mini téléphone et demandes de la fiche", () => {
++    const panel = () => h(FichePreviewPanel, { ficheId: 12 });
++    beforeEach(() => {
++      store = [
++        demande({ id: 1, statut: "demande" }),
++        demande({
++          id: 9,
++          statut: "demande",
++          section: "menu",
++          fiche: {
++            id: 99,
++            slug: "autre",
++            prenom: "A",
++            nom: "B",
++            entreprise: null,
++          },
++        }),
++      ];
++    });
++
++    it("liste les demandes de CETTE fiche et affiche la fiche complète dans le mini téléphone", async () => {
++      await mount(panel());
++      expect(
++        calls.find(c => c.url === "admin/production/section-stickers")?.params,
++      ).toMatchObject({ ficheId: 12 });
++      expect(host.textContent).toContain("Menu");
++      expect(host.textContent).toContain("20 stickers");
++      expect(host.textContent).not.toContain("/autre");
++      expect(host.querySelector(".fiche-preview-device")).toBeTruthy();
++      expect(host.querySelector(".f-hero")).toBeTruthy(); // fiche complète par défaut
++    });
++
++    it("« Aperçu » montre la section dans le téléphone, puis on revient à la fiche", async () => {
++      await mount(panel());
++      await click(btn(host, "Aperçu")!);
++      expect(host.querySelector(".ss-head")).toBeTruthy();
++      expect(host.querySelector(".f-hero")).toBeNull();
++      expect(host.textContent).toContain(
++        `Aperçu de la section « ${TAB_TYPES.menu.label} »`,
++      );
++      await click(btn(host, "Revenir à la fiche")!);
++      expect(host.querySelector(".f-hero")).toBeTruthy();
++      expect(host.querySelector(".ss-head")).toBeNull();
++    });
++
++    it("« Voir la fiche » (même bouton) ramène aussi à la fiche complète", async () => {
++      await mount(panel());
++      await click(btn(host, "Aperçu")!);
++      await click(btn(host, "Voir la fiche")!);
++      expect(host.querySelector(".f-hero")).toBeTruthy();
++    });
++
++    it("activer depuis la fiche envoie la décision et met la liste à jour", async () => {
++      await mount(panel());
++      await click(btn(host, "Activer la section")!);
++      expect(patches()[0]).toMatchObject({
++        url: "admin/production/section-stickers/1",
++        body: { statut: "active" },
++      });
++      expect(host.textContent).toContain("Activée");
++      expect(btn(host, "Activer la section")).toBeUndefined();
++      expect(btn(host, "Désactiver")).toBeTruthy();
++    });
++
++    it("sans demande : message, mais le mini téléphone reste affiché", async () => {
++      store = [];
++      await mount(panel());
++      expect(host.textContent).toContain(
++        "Aucune demande de stickers pour cette fiche",
++      );
++      expect(host.querySelector(".f-hero")).toBeTruthy();
++    });
++
++    it("fiche illisible : erreur dans la zone du téléphone, la liste des demandes reste utilisable", async () => {
++      failFiche = true;
++      await mount(panel());
++      expect(host.textContent).toContain("Fiche indisponible");
++      expect(host.querySelector(".fiche-preview-device")).toBeNull();
++      expect(btn(host, "Activer la section")).toBeTruthy();
++    });
++
++    it("liste des demandes illisible : erreur, mais le mini téléphone s'affiche quand même", async () => {
++      failList = true;
++      await mount(panel());
++      expect(host.textContent).toContain("Liste indisponible");
++      expect(host.querySelector(".f-hero")).toBeTruthy();
++    });
++  });
++});
+diff --git a/src/features/admin/components/SectionStickers.tsx b/src/features/admin/components/SectionStickers.tsx
+new file mode 100644
+index 0000000..01f5b26
+--- /dev/null
++++ b/src/features/admin/components/SectionStickers.tsx
+@@ -0,0 +1,294 @@
++import { useState } from "react";
++import { Link } from "react-router-dom";
++import Fiche from "../../espace-client/components/Fiche";
++import PhonePreview from "../../espace-client/components/PhonePreview";
++import StickerSectionView from "../../espace-client/components/sticker/StickerSectionView";
++import { fetchFiche } from "../../espace-client/lib/ficheApi";
++import { toApiError } from "../../../lib/apiError";
++import type { SectionStickerAdmin } from "../../../types/admin";
++import { adminApi } from "../admin.service";
++import { useData } from "../hooks/useData";
++import { fdate } from "../lib/format";
++import {
++  DECISIONS,
++  DECISION_DONE,
++  SS_STATUT,
++  displayName,
++  sectionLabel,
++  type SectionDecision,
++} from "../lib/sectionStickers";
++import {
++  Badge,
++  Btn,
++  Empty,
++  ErrorBox,
++  Loading,
++  Modal,
++  Seg,
++  useAction,
++} from "./ui";
++
++/*
++  Stickers par section, côté administration : le client demande un devis (nombre de stickers) ; l'administration traite
++  la demande, regarde l'aperçu et ACTIVE la section. Tant qu'elle n'est pas activée, la page /s/:slug/:section affiche
++  la fiche complète ; une fois activée, seule cette section est servie et le client reçoit son lien et son QR.
++*/
++
++/** Décision de l'administration (activer, désactiver, refuser) puis rechargement. */
++function useDecision(onChanged: () => void) {
++  const run = useAction();
++  return async (d: SectionStickerAdmin, to: SectionDecision) => {
++    if (
++      await run(
++        () => adminApi.setSectionStickerStatus(d.id, to),
++        DECISION_DONE[to],
++      )
++    )
++      onChanged();
++  };
++}
++
++/** Mini téléphone : la fiche entière, ou UNE section telle que la verra la personne qui scanne (même non activée). */
++export function FichePhone({
++  ficheId,
++  section,
++}: {
++  ficheId: number;
++  section: string | null;
++}) {
++  const [fiche, reload, err] = useData(
++    () =>
++      // message du serveur plutôt que celui de la bibliothèque HTTP
++      fetchFiche(`fiches/${ficheId}`).catch(e => {
++        throw toApiError(e);
++      }),
++    [ficheId],
++  );
++  if (err) return <ErrorBox message={err} onRetry={reload} />;
++  if (!fiche) return <Loading />;
++  return (
++    <PhonePreview>
++      {scroller =>
++        section ? (
++          <StickerSectionView
++            key={`${fiche.id}-${section}`}
++            fiche={fiche}
++            section={section}
++            scrollerRef={scroller}
++            preview
++          />
++        ) : (
++          <Fiche key={fiche.id} fiche={fiche} scrollerRef={scroller} />
++        )
++      }
++    </PhonePreview>
++  );
++}
++
++/** Aperçu d'une section demandée, en fenêtre (depuis la liste des demandes). */
++function PreviewModal({
++  demande,
++  onClose,
++}: {
++  demande: SectionStickerAdmin;
++  onClose: () => void;
++}) {
++  return (
++    <Modal
++      title={`Aperçu · ${sectionLabel(demande.section)} · ${displayName(demande.fiche)}`}
++      onClose={onClose}
++      wide
++    >
++      <p className="adm-muted">
++        Ce que verra la personne qui scanne le sticker (aperçu : la section n'a
++        pas besoin d'être activée).
++      </p>
++      <FichePhone ficheId={demande.fiche.id} section={demande.section} />
++    </Modal>
++  );
++}
++
++const FILTERS = [
++  ["todo", "À traiter"],
++  ["active", "Activées"],
++  ["all", "Toutes"],
++] as const;
++type Filter = (typeof FILTERS)[number][0];
++const matches = (f: Filter, d: SectionStickerAdmin) =>
++  f === "all"
++    ? true
++    : f === "todo"
++      ? d.statut === "demande"
++      : d.statut === "active";
++
++/**
++ * Onglet « Stickers par section » de la page Production : toutes les demandes des clients.
++ * Chargement et erreur sont gérés ici : une API pas encore à jour ne doit pas bloquer le reste de la page Production.
++ */
++export function SectionStickersTab({
++  data,
++  error,
++  onChanged,
++}: {
++  data: SectionStickerAdmin[] | null;
++  error: string | null;
++  onChanged: () => void;
++}) {
++  const [filter, setFilter] = useState<Filter>("todo");
++  const [preview, setPreview] = useState<SectionStickerAdmin | null>(null);
++  const decide = useDecision(onChanged);
++  if (error) return <ErrorBox message={error} onRetry={onChanged} />;
++  if (!data) return <Loading />;
++  const list = data.filter(d => matches(filter, d));
++  return (
++    <section aria-label="Stickers par section">
++      <p className="adm-muted">
++        Demandes de devis des clients. « Activer la section » ouvre la page /s/…
++        au public et donne au client son lien et son QR.
++      </p>
++      <Seg value={filter} onChange={setFilter} options={FILTERS} />
++      {list.length === 0 ? (
++        <Empty>
++          {filter === "todo" ? "Aucune demande à traiter." : "Aucune demande."}
++        </Empty>
++      ) : (
++        <div className="table-wrap">
++          <table className="adm-tbl">
++            <thead>
++              <tr>
++                <th>Fiche</th>
++                <th>Section</th>
++                <th>Stickers</th>
++                <th>Client</th>
++                <th>Demandée le</th>
++                <th>État</th>
++                <th aria-label="Actions" />
++              </tr>
++            </thead>
++            <tbody>
++              {list.map(d => (
++                <tr key={d.id}>
++                  <td>
++                    <Link to={`/admin/fiches/${d.fiche.id}`}>
++                      <b>{displayName(d.fiche)}</b>
++                    </Link>
++                    <br />
++                    <span className="adm-muted">/{d.fiche.slug}</span>
++                  </td>
++                  <td>{sectionLabel(d.section)}</td>
++                  <td>{d.quantite}</td>
++                  <td>
++                    {d.client?.nom || "—"}
++                    {d.client?.email && (
++                      <>
++                        <br />
++                        <span className="adm-muted">{d.client.email}</span>
++                      </>
++                    )}
++                  </td>
++                  <td>{fdate(d.createdAt)}</td>
++                  <td>
++                    <Badge tone={SS_STATUT[d.statut].tone}>
++                      {SS_STATUT[d.statut].label}
++                    </Badge>
++                  </td>
++                  <td className="ss-actions">
++                    <Btn onClick={() => setPreview(d)}>Aperçu</Btn>
++                    {DECISIONS[d.statut].map(a => (
++                      <Btn
++                        key={a.to}
++                        kind={a.primary ? "red" : undefined}
++                        onClick={() => void decide(d, a.to)}
++                      >
++                        {a.label}
++                      </Btn>
++                    ))}
++                  </td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        </div>
++      )}
++      {preview && (
++        <PreviewModal demande={preview} onClose={() => setPreview(null)} />
++      )}
++    </section>
++  );
++}
++
++/** Panneau de la fiche détail (/admin/fiches/:id) : mini téléphone + demandes de stickers de CETTE fiche. */
++export function FichePreviewPanel({ ficheId }: { ficheId: number }) {
++  const [data, reload, err] = useData(
++    () => adminApi.listSectionStickers({ ficheId }),
++    [ficheId],
++  );
++  const [section, setSection] = useState<string | null>(null);
++  const decide = useDecision(reload);
++  const demandes = data?.demandes ?? [];
++  return (
++    <section className="panel" aria-label="Aperçu et stickers par section">
++      <div className="panel-h">
++        <h2>Aperçu et stickers par section</h2>
++      </div>
++      <div className="fd-prev">
++        <div className="fd-prev-list">
++          {err ? (
++            <ErrorBox message={err} onRetry={reload} />
++          ) : !data ? (
++            <Loading />
++          ) : demandes.length === 0 ? (
++            <p className="adm-muted">
++              Aucune demande de stickers pour cette fiche.
++            </p>
++          ) : (
++            <ul className="fd-ss">
++              {demandes.map(d => (
++                <li key={d.id}>
++                  <div>
++                    <b>{sectionLabel(d.section)}</b>{" "}
++                    <Badge tone={SS_STATUT[d.statut].tone}>
++                      {SS_STATUT[d.statut].label}
++                    </Badge>
++                    <br />
++                    <span className="adm-muted">
++                      {d.quantite} sticker{d.quantite > 1 ? "s" : ""} · demandée
++                      le {fdate(d.createdAt)}
++                    </span>
++                  </div>
++                  <span className="ss-actions">
++                    <Btn
++                      onClick={() =>
++                        setSection(section === d.section ? null : d.section)
++                      }
++                    >
++                      {section === d.section ? "Voir la fiche" : "Aperçu"}
++                    </Btn>
++                    {DECISIONS[d.statut].map(a => (
++                      <Btn
++                        key={a.to}
++                        kind={a.primary ? "red" : undefined}
++                        onClick={() => void decide(d, a.to)}
++                      >
++                        {a.label}
++                      </Btn>
++                    ))}
++                  </span>
++                </li>
++              ))}
++            </ul>
++          )}
++          {section && (
++            <p className="adm-muted">
++              Aperçu de la section « {sectionLabel(section)} ».{" "}
++              <button className="adm-link" onClick={() => setSection(null)}>
++                Revenir à la fiche
++              </button>
++            </p>
++          )}
++        </div>
++        <FichePhone ficheId={ficheId} section={section} />
++      </div>
++    </section>
++  );
++}
+diff --git a/src/features/admin/lib/sectionStickers.ts b/src/features/admin/lib/sectionStickers.ts
+new file mode 100644
+index 0000000..f24fca1
+--- /dev/null
++++ b/src/features/admin/lib/sectionStickers.ts
+@@ -0,0 +1,44 @@
++import { TAB_TYPES } from "../../../lib/plans";
++import type { TabType } from "../../../types";
++import type { SectionStickerAdmin } from "../../../types/admin";
++
++/* Stickers par section : libellés et décisions possibles, côté administration (logique pure). */
++type Statut = SectionStickerAdmin["statut"];
++
++export const SS_STATUT: Record<Statut, { label: string; tone: string }> = {
++  demande: { label: "À traiter", tone: "gold" },
++  active: { label: "Activée", tone: "green" },
++  desactivee: { label: "Désactivée", tone: "grey" },
++  refusee: { label: "Refusée", tone: "red" },
++};
++
++/** Nom lisible d'une section : un type d'onglet connu, sinon un onglet personnalisé. */
++export const sectionLabel = (key: string): string =>
++  key in TAB_TYPES ? TAB_TYPES[key as TabType].label : "Onglet personnalisé";
++
++export type SectionDecision = "active" | "desactivee" | "refusee";
++
++/** Décisions possibles selon l'état (reflète les transitions acceptées par le serveur). */
++export const DECISIONS: Record<
++  Statut,
++  { to: SectionDecision; label: string; primary?: boolean }[]
++> = {
++  demande: [
++    { to: "active", label: "Activer la section", primary: true },
++    { to: "refusee", label: "Refuser" },
++  ],
++  active: [{ to: "desactivee", label: "Désactiver" }],
++  desactivee: [{ to: "active", label: "Réactiver", primary: true }],
++  refusee: [],
++};
++
++export const DECISION_DONE: Record<SectionDecision, string> = {
++  active: "Section activée : le client voit maintenant son lien et son QR",
++  desactivee: "Section désactivée : la page redevient la fiche complète",
++  refusee: "Demande refusée",
++};
++
++export const displayName = (f: SectionStickerAdmin["fiche"]) =>
++  f.entreprise?.trim() ||
++  [f.prenom, f.nom].filter(Boolean).join(" ").trim() ||
++  f.slug;
+diff --git a/src/features/admin/pages/FicheDetail.tsx b/src/features/admin/pages/FicheDetail.tsx
+index 3aa8f5f..0f4d5c3 100644
+--- a/src/features/admin/pages/FicheDetail.tsx
++++ b/src/features/admin/pages/FicheDetail.tsx
+@@ -16,6 +16,7 @@ import {
+   Seg,
+   useAction,
+ } from "../components/ui";
++import { FichePreviewPanel } from "../components/SectionStickers";
+ import { useData } from "../hooks/useData";
+ import {
+   FORMULES,
+@@ -163,6 +164,8 @@ function FicheDetail({ id }: { id: number }) {
+         )}
+       </section>
+ 
++      <FichePreviewPanel ficheId={id} />
++
+       <section className="panel">
+         <div className="panel-h">
+           <h2>Abonnements</h2>
+diff --git a/src/features/admin/pages/Production.tsx b/src/features/admin/pages/Production.tsx
+index 750ae80..9207598 100644
+--- a/src/features/admin/pages/Production.tsx
++++ b/src/features/admin/pages/Production.tsx
+@@ -1,6 +1,7 @@
+ import { useEffect, useState } from 'react';
+ import { Link } from 'react-router-dom';
+ import { adminApi } from '../admin.service';
++import { SectionStickersTab } from '../components/SectionStickers';
+ import { Badge, Btn, Empty, ErrorBox, Icon, Kpi, Loading, Modal, Tabs, useAction, useToast } from '../components/ui';
+ import { useData } from '../hooks/useData';
+ import { NouvelleCarteModal, NouveauStickerModal } from '../components/ProductionModals';
+@@ -46,13 +47,14 @@ export default function Production() {
+   const [cartes, rC, eC] = useData(() => adminApi.listCartes());
+   const [stickers, rS, eS] = useData(() => adminApi.listStickers());
+   const [qr, rQ, eQ] = useData(() => adminApi.listQr());
+-  const [tab, setTab] = useState<'cartes' | 'fonction' | 'telephone' | 'qr'>('cartes');
++  const [sec, rSec, eSec] = useData(() => adminApi.listSectionStickers());
++  const [tab, setTab] = useState<'cartes' | 'fonction' | 'telephone' | 'qr' | 'sections'>('cartes');
+   const [vue, setVue] = useState<Vue | null>(null), [creation, setCreation] = useState<Creation>(null), [busy, setBusy] = useState<string | null>(null);
+   const run = useAction();
+ 
+   console.log(cartes)
+ 
+-  const refresh = () => { rSum(); rC(); rS(); rQ(); };
++  const refresh = () => { rSum(); rC(); rS(); rQ(); rSec(); };
+   const err = eSum || eC || eS || eQ;
+   if (err) return <ErrorBox message={err} onRetry={refresh} />;
+   if (!sum || !cartes || !stickers || !qr) return <Loading />;
+@@ -79,7 +81,7 @@ export default function Production() {
+         <Kpi icon="zap" label="QR dynamiques sans cible" value={sum.qrSansCible} sub="à régler avant impression" tone={sum.qrSansCible ? 'down' : undefined} onClick={() => setTab('qr')} />
+         <Kpi icon="eye" label="Scans des QR dynamiques" value={sum.scansQr} sub="cumul" />
+       </section>
+-      <Tabs value={tab} onChange={setTab} tabs={[['cartes', 'Cartes · Evolis', cartes.cartes.length], ['fonction', 'Stickers à fonction', fonc.length], ['telephone', 'Stickers 30 mm', tel.length], ['qr', 'QR dynamiques', qr.qr.length]]} />
++      <Tabs value={tab} onChange={setTab} tabs={[['cartes', 'Cartes · Evolis', cartes.cartes.length], ['fonction', 'Stickers à fonction', fonc.length], ['telephone', 'Stickers 30 mm', tel.length], ['qr', 'QR dynamiques', qr.qr.length], ['sections', 'Stickers par section', (sec?.demandes ?? []).filter((d) => d.statut === 'demande').length]]} />
+ 
+       {tab === 'cartes' && (cartes.cartes.length ? <div className="table-wrap"><table className="adm-tbl">
+         <thead><tr><th>Client</th><th>Carte</th><th>Puce NFC : adresse à encoder</th><th>Fichiers 300 dpi</th><th>Statut</th></tr></thead>
+@@ -132,6 +134,7 @@ export default function Production() {
+             <td data-l="Statut">{statutSelect(x.statut, SS, (s) => setSticker(x, s))}</td>
+           </tr>))}</tbody></table></div> : <Empty>Aucun sticker 30 mm.</Empty>)}
+ 
++      {tab === 'sections' && <SectionStickersTab data={sec?.demandes ?? null} error={eSec} onChanged={refresh} />}
+       {tab === 'qr' && (qr.qr.length ? <div className="table-wrap"><table className="adm-tbl">
+         <thead><tr><th>Code</th><th>Sticker</th><th>Cible (modifiable à distance)</th><th>Actif</th><th>Scans</th></tr></thead>
+         <tbody>{qr.qr.map((q) => <QrRow key={q.code} q={q}
+diff --git a/src/features/espace-client/README.md b/src/features/espace-client/README.md
+index 0b1586d..e548c69 100644
+--- a/src/features/espace-client/README.md
++++ b/src/features/espace-client/README.md
+@@ -74,23 +74,33 @@ scanne sa fiche. Une personne qui ouvre la fiche en la scannant ne les voit pas.
+ 
+ ## Stickers par section
+ 
+-Un sticker (QR) peut ouvrir **une seule section** de la fiche au lieu de la fiche entière : `/s/:slug/:section`
+-(`section` = type de l'onglet, ex. `menu`, `biens`, ou l'identifiant d'un onglet personnalisé).
++Un sticker (QR) ouvre **une seule section** de la fiche : `/s/:slug/:section` (`section` = type de l'onglet, ex. `menu`, ou
++l'identifiant d'un onglet personnalisé). Le parcours passe par l'administration :
++
++1. **Le client demande un devis** (bloc « Stickers par section » de l'éditeur) : il indique le **nombre de stickers** pour
++   la section voulue. Pro et Signature seulement, fiche publiée, abonnement valide.
++2. **L'administration** voit la demande (Production › « Stickers par section », ou fiche détail), regarde l'aperçu et
++   **active la section**. Elle peut aussi la refuser ou la désactiver plus tard.
++3. **Une fois la section activée**, le client voit dans l'éditeur le lien à copier, le QR (SVG), l'aperçu et « Ouvrir ».
++
++- **Seule une section activée est servie au public** : la fiche publique expose `stickerSections` (clés activées) et
++  `resolveStickerSection` retombe sur la fiche complète sinon (`fallback: "inactive"`). Abonnement échu : plus aucune
++  section servie. `preview` (`StickerSectionView`) lève l'exigence d'activation : aperçu de l'administration et de l'éditeur.
++- Une seule demande « ouverte » (à traiter ou activée) par fiche et par section ; refusée ou désactivée, elle peut être refaite.
+ 
+ ```
+-lib/stickerSections.ts                    logique PURE : droits (Pro/Signature), clé d'URL, résolution, section du secteur
++lib/stickerSections.ts                    logique PURE : droits, clé d'URL, résolution + activation, quantité, dernière demande
+ pages/StickerSectionPage.tsx              /s/:slug/:section : charge la fiche, compte un passage « qr », noindex
+ components/sticker/StickerSectionView.tsx choisit : la section, ou la fiche complète en repli
+ components/sticker/StickerSection.tsx     logo + nom + UNE section + bouton « Voir la fiche complète »
+-components/editor/sections/StickerBox.tsx liens et QR (SVG) par section, dans l'éditeur
++components/editor/sections/StickerBox.tsx devis, état de la demande, puis lien / QR / aperçu quand la section est activée
++components/PhonePreview.tsx               mini téléphone partagé (aperçu de fiche, éditeur, administration)
+ ```
+ 
+-- **Repli sur la fiche complète** : formule Essentielle, section masquée, supprimée ou inconnue.
+ - **La fiche principale (`Fiche.tsx`, `fiche/`) n'est pas modifiée** : la page réutilise `fiche/SectionBody`.
+-- Aucune donnée nouvelle : pas de nouvelle clé dans `FicheData`, donc pas de changement de schéma serveur.
+-- Préparé pour la suite (stickers gérés comme entités, code `/q/:code`) : le sticker n'aura qu'à rediriger vers
+-  `/s/:slug/:section`. Pour une section **propre au sticker** (Wi-Fi, jeu…), il faudra stocker son contenu côté API.
+-- `vercel.json` : `/s/...` est servi par l'application (règle `/(.*)` → `index.html`), sans règle supplémentaire.
++- `vercel.json` : `/s/...` est servi par l'application (règle `/(.*)` → `index.html`).
++- Non couvert : une section **propre au sticker** (Wi-Fi, jeu…) : son contenu n'existe dans aucune donnée de la fiche.
++- Le détail du suivi et des statuts est dans `admin/README.md` (côté administration) et dans le README de l'API.
+ 
+ ## Modèles : où est la référence ?
+ 
+diff --git a/src/features/espace-client/components/Editor.css b/src/features/espace-client/components/Editor.css
+index 68e2fbb..8c6c905 100644
+--- a/src/features/espace-client/components/Editor.css
++++ b/src/features/espace-client/components/Editor.css
+@@ -907,3 +907,15 @@
+ .edp-prev-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: center; margin: 0 0 10px; font-size: 13px; }
+ .edp-prev-bar button { padding: 4px 10px; border-radius: 999px; border: 1px solid currentColor; background: none; color: inherit; cursor: pointer; }
+ .device-in .ss { min-height: 100%; }
++
++/* Stickers par section : demande de devis */
++.ed-stk-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
++.ed-stk-quote { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; margin-top: 4px; }
++.ed-stk-quote label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
++.ed-stk-quote input[type="number"] { width: 96px; }
++.ed-stk-quote small { flex-basis: 100%; }
++.ed-stk-err { color: #a11225; }
++.ed-stk-state { margin: 4px 0 0; font-size: 13px; }
++.ed-stk-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #f3ead2; color: #7a5b12; }
++.ed-stk-badge.bad { background: #f8dde0; color: #a11225; }
++.ed-stk-active { display: flex; gap: 12px; align-items: flex-start; margin-top: 4px; }
+diff --git a/src/features/espace-client/components/PhonePreview.tsx b/src/features/espace-client/components/PhonePreview.tsx
+new file mode 100644
+index 0000000..4f3a39a
+--- /dev/null
++++ b/src/features/espace-client/components/PhonePreview.tsx
+@@ -0,0 +1,23 @@
++import { useRef, type ReactNode, type RefObject } from "react";
++
++/**
++ * Mini téléphone d'aperçu (cadre + zone défilante). Utilisé par la page d'aperçu de la fiche (`/fiche/preview/:id`)
++ * et par l'administration (`/admin/fiches/:id`, aperçu des sections de stickers). Le style est global
++ * (styles/global.css, `.fiche-preview-*`). `children` reçoit la zone défilante, à passer à `<Fiche scrollerRef>`.
++ */
++export default function PhonePreview({
++  children,
++}: {
++  children: (scrollerRef: RefObject<HTMLDivElement>) => ReactNode;
++}) {
++  const scroller = useRef<HTMLDivElement>(null);
++  return (
++    <div className="fiche-preview-stage">
++      <div className="fiche-preview-device">
++        <div className="fiche-preview-device-in" ref={scroller}>
++          {children(scroller)}
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/features/espace-client/components/editor/sections/StickerBox.test.tsx b/src/features/espace-client/components/editor/sections/StickerBox.test.tsx
+new file mode 100644
+index 0000000..35fcc43
+--- /dev/null
++++ b/src/features/espace-client/components/editor/sections/StickerBox.test.tsx
+@@ -0,0 +1,318 @@
++// @vitest-environment jsdom
++import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
++import { AxiosError } from "axios";
++import { act, createElement as h } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { MemoryRouter } from "react-router-dom";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { api } from "../../../../../lib/api";
++import { FICHES } from "../../../../../test/fixtures/fiches";
++import type { ApiSectionSticker, FicheRecord } from "../../../../../types";
++import StickerBox from "./StickerBox";
++
++(
++  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++/*
++  « Stickers par section » côté client : le client demande un DEVIS (nombre de stickers) ; l'administration active la
++  section ; ce n'est qu'alors que le lien, le QR, l'aperçu et l'ouverture apparaissent.
++*/
++const fiche = (slug = "le-sunset"): FicheRecord => ({
++  ...structuredClone(FICHES.find(f => f.slug === slug)!),
++  id: 12,
++});
++const demande = (over: Partial<ApiSectionSticker> = {}): ApiSectionSticker => ({
++  id: 1,
++  section: "menu",
++  quantite: 20,
++  message: null,
++  statut: "demande",
++  createdAt: "2026-10-29T10:00:00Z",
++  activatedAt: null,
++  ...over,
++});
++
++describe("StickerBox : demande de devis", () => {
++  const original = api.defaults.adapter;
++  let store: ApiSectionSticker[];
++  let calls: {
++    method?: string;
++    url?: string;
++    body?: Record<string, unknown>;
++  }[];
++  let failList = false;
++  let failPost: { status: number; message: string } | null = null;
++  let root: Root;
++  let host: HTMLDivElement;
++
++  beforeEach(() => {
++    store = [];
++    calls = [];
++    failList = false;
++    failPost = null;
++    host = document.createElement("div");
++    document.body.appendChild(host);
++    root = createRoot(host);
++    api.defaults.adapter = async config => {
++      const body =
++        typeof config.data === "string" ? JSON.parse(config.data) : undefined;
++      calls.push({ method: config.method, url: config.url, body });
++      const mk = (data: unknown, status = 200) => ({
++        status,
++        data,
++        statusText: "",
++        headers: {},
++        config,
++      });
++      if (
++        config.url === "fiches/12/section-stickers" &&
++        config.method === "get"
++      ) {
++        if (failList)
++          throw new AxiosError(
++            "fail",
++            "500",
++            config,
++            undefined,
++            mk({ error: { message: "Serveur indisponible" } }, 500),
++          );
++        return mk({ demandes: store });
++      }
++      if (
++        config.url === "fiches/12/section-stickers" &&
++        config.method === "post"
++      ) {
++        if (failPost)
++          throw new AxiosError(
++            "fail",
++            String(failPost.status),
++            config,
++            undefined,
++            mk({ error: { message: failPost.message } }, failPost.status),
++          );
++        const created = demande({
++          id: store.length + 10,
++          section: body!.section as string,
++          quantite: body!.quantite as number,
++          createdAt: new Date().toISOString(),
++        });
++        store = [created, ...store];
++        return mk({ demande: created }, 201);
++      }
++      return mk({});
++    };
++  });
++  afterEach(() => {
++    api.defaults.adapter = original;
++    act(() => root.unmount());
++    host.remove();
++  });
++
++  const settle = async () => {
++    for (let i = 0; i < 8; i++)
++      await act(async () => void (await new Promise(r => setTimeout(r, 0))));
++  };
++  const open = async (
++    f: FicheRecord = fiche(),
++    extra: Record<string, unknown> = {},
++  ) => {
++    await act(async () =>
++      root.render(
++        h(
++          QueryClientProvider,
++          {
++            client: new QueryClient({
++              defaultOptions: { queries: { retry: false } },
++            }),
++          },
++          h(MemoryRouter, null, h(StickerBox, { fiche: f, ...extra })),
++        ),
++      ),
++    );
++    await settle();
++  };
++  const rows = () => [...host.querySelectorAll<HTMLElement>("li.ed-stk")];
++  const rowOf = (statut: string, nth = 0) =>
++    rows().filter(r => r.dataset.statut === statut)[nth];
++  const btn = (scope: ParentNode, label: string) =>
++    [...scope.querySelectorAll("button")].find(b =>
++      b.textContent?.startsWith(label),
++    ) as HTMLButtonElement | undefined;
++  const type = async (el: HTMLInputElement, v: string) => {
++    await act(async () => {
++      Object.getOwnPropertyDescriptor(
++        HTMLInputElement.prototype,
++        "value",
++      )!.set!.call(el, v);
++      el.dispatchEvent(new Event("input", { bubbles: true }));
++    });
++  };
++  const posts = () => calls.filter(c => c.method === "post");
++
++  it("formule Essentielle : bloc verrouillé, aucune demande ni requête", async () => {
++    await open(fiche("awa-ndiaye"));
++    expect(host.querySelector(".ed-lock")).toBeTruthy();
++    expect(host.querySelector("form")).toBeNull();
++    expect(calls.filter(c => c.url?.includes("section-stickers"))).toHaveLength(
++      0,
++    );
++  });
++
++  it("sans demande : un formulaire de devis par section, AUCUN lien ni QR", async () => {
++    await open();
++    expect(rows().length).toBeGreaterThan(1);
++    expect(host.querySelectorAll("form.ed-stk-quote")).toHaveLength(
++      rows().length,
++    );
++    expect(host.textContent).toContain("Demander un devis");
++    expect(host.textContent).not.toContain("Copier le lien");
++    expect(host.textContent).not.toContain("QR (SVG)");
++    expect(host.querySelector("svg[aria-label*='QR'], .ed-stk-qr")).toBeNull();
++    expect(
++      host.querySelector<HTMLInputElement>('input[type="number"]')!.value,
++    ).toBe("10"); // quantité par défaut
++  });
++
++  it("la section du secteur est proposée en premier et signalée", async () => {
++    await open();
++    expect(rows()[0].textContent).toContain("Conseillée pour votre secteur");
++  });
++
++  it("envoie la demande avec la section et le nombre choisis, puis affiche « demande envoyée »", async () => {
++    await open();
++    const first = rows()[0];
++    await type(
++      first.querySelector<HTMLInputElement>('input[type="number"]')!,
++      "25",
++    );
++    await act(
++      async () =>
++        void first
++          .querySelector("form")!
++          .dispatchEvent(
++            new Event("submit", { bubbles: true, cancelable: true }),
++          ),
++    );
++    await settle();
++    expect(posts()).toHaveLength(1);
++    expect(posts()[0].body).toEqual({ section: "menu", quantite: 25 });
++    expect(rowOf("demande").textContent).toContain("Demande envoyée");
++    expect(rowOf("demande").textContent).toContain("25 stickers");
++    expect(rowOf("demande").textContent).not.toContain("Copier le lien"); // rien n'est activé tant que l'admin n'a pas décidé
++  });
++
++  it.each(["0", "501", "-3", "2.5", "abc", ""])(
++    "quantité « %s » refusée : bouton désactivé et aucun envoi",
++    async raw => {
++      await open();
++      const first = rows()[0];
++      await type(
++        first.querySelector<HTMLInputElement>('input[type="number"]')!,
++        raw,
++      );
++      expect(btn(first, "Demander un devis")!.disabled).toBe(true);
++      await act(
++        async () =>
++          void first
++            .querySelector("form")!
++            .dispatchEvent(
++              new Event("submit", { bubbles: true, cancelable: true }),
++            ),
++      );
++      expect(posts()).toHaveLength(0);
++      expect(first.textContent).toContain("entre 1 et 500");
++    },
++  );
++
++  it("une erreur du serveur est affichée sous la section", async () => {
++    failPost = {
++      status: 409,
++      message: "Une demande est déjà en cours pour cette section.",
++    };
++    await open();
++    const first = rows()[0];
++    await act(
++      async () =>
++        void first
++          .querySelector("form")!
++          .dispatchEvent(
++            new Event("submit", { bubbles: true, cancelable: true }),
++          ),
++    );
++    await settle();
++    expect(first.textContent).toContain(
++      "Une demande est déjà en cours pour cette section.",
++    );
++  });
++
++  it("section ACTIVÉE : lien, QR, aperçu et ouverture apparaissent (et seulement alors)", async () => {
++    store = [
++      demande({ statut: "active", activatedAt: "2026-10-30T09:00:00Z" }),
++    ];
++    const onPreview = vi.fn();
++    await open(fiche(), { previewSection: null, onPreviewSection: onPreview });
++    const active = rowOf("active");
++    expect(btn(active, "Copier le lien")).toBeTruthy();
++    expect(btn(active, "QR (SVG)")).toBeTruthy();
++    expect(btn(active, "Aperçu")).toBeTruthy();
++    expect(active.querySelector("a.ed-up")?.getAttribute("href")).toMatch(
++      /\/s\/le-sunset\/menu$/,
++    );
++    expect(active.querySelector("form")).toBeNull(); // plus de devis à demander
++    await act(async () => btn(active, "Aperçu")!.click());
++    expect(onPreview).toHaveBeenCalledWith("menu");
++    // les autres sections n'ont toujours que le formulaire de devis
++    const others = rows().filter(r => r !== active);
++    expect(others.every(r => !r.textContent?.includes("Copier le lien"))).toBe(
++      true,
++    );
++    expect(others.every(r => r.querySelector("form"))).toBe(true);
++  });
++
++  it("section désactivée par l'administration : outils retirés, nouvelle demande possible", async () => {
++    store = [demande({ statut: "desactivee" })];
++    await open();
++    const r = rowOf("desactivee");
++    expect(r.textContent).toContain("Section désactivée");
++    expect(r.textContent).not.toContain("Copier le lien");
++    expect(btn(r, "Refaire une demande de devis")).toBeTruthy();
++  });
++
++  it("demande refusée : message clair et nouvelle demande possible", async () => {
++    store = [demande({ statut: "refusee" })];
++    await open();
++    const r = rowOf("refusee");
++    expect(r.textContent).toContain("Demande refusée");
++    expect(btn(r, "Refaire une demande de devis")).toBeTruthy();
++  });
++
++  it("seule la demande la plus récente de la section compte", async () => {
++    store = [
++      demande({
++        id: 2,
++        statut: "demande",
++        quantite: 40,
++        createdAt: "2026-10-30T10:00:00Z",
++      }),
++      demande({ id: 1, statut: "refusee", createdAt: "2026-10-01T10:00:00Z" }),
++    ];
++    await open();
++    expect(rowOf("demande").textContent).toContain("40 stickers");
++    expect(rowOf("refusee")).toBeUndefined();
++  });
++
++  it("le singulier est respecté (1 sticker)", async () => {
++    store = [demande({ quantite: 1 })];
++    await open();
++    expect(rowOf("demande").textContent).toContain("1 sticker ·");
++    expect(rowOf("demande").textContent).not.toContain("1 stickers");
++  });
++
++  it("erreur de chargement : message et bouton « Réessayer »", async () => {
++    failList = true;
++    await open();
++    expect(host.textContent).toContain("Impossible de charger vos demandes");
++    expect(btn(host, "Réessayer")).toBeTruthy();
++  });
++});
+diff --git a/src/features/espace-client/components/editor/sections/StickerBox.tsx b/src/features/espace-client/components/editor/sections/StickerBox.tsx
+index 668d7b1..6317cd2 100644
+--- a/src/features/espace-client/components/editor/sections/StickerBox.tsx
++++ b/src/features/espace-client/components/editor/sections/StickerBox.tsx
+@@ -1,9 +1,19 @@
+-import { useRef, useState } from "react";
++import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
++import { useRef, useState, type FormEvent } from "react";
+ import { ENV } from "../../../../../lib/env";
++import { toApiError } from "../../../../../lib/apiError";
+ import { TAB_TYPES } from "../../../../../lib/plans";
+-import type { FicheRecord } from "../../../../../types";
++import type { ApiSectionSticker, FicheRecord } from "../../../../../types";
+ import {
++  createSectionSticker,
++  getSectionStickers,
++} from "../../../espaceClient.service";
++import {
++  DEFAULT_STICKERS,
++  MAX_STICKERS,
+   hasStickers,
++  latestBySection,
++  parseQuantity,
+   sectionTitle,
+   stickerPath,
+   stickerSections,
+@@ -22,7 +32,78 @@ interface Preview {
+   onPreviewSection?: (key: string | null) => void;
+ }
+ 
+-function StickerRow({
++const stickersLabel = (n: number) => `${n} sticker${n > 1 ? "s" : ""}`;
++
++/** Demande de devis : le client indique le nombre de stickers ; l'administration traite puis active la section. */
++function QuoteForm({
++  fiche,
++  sectionKey,
++  retry,
++}: {
++  fiche: FicheRecord;
++  sectionKey: string;
++  retry: boolean;
++}) {
++  const queryClient = useQueryClient();
++  const [raw, setRaw] = useState(String(DEFAULT_STICKERS));
++  const quantite = parseQuantity(raw);
++  const mutation = useMutation({
++    mutationFn: () =>
++      createSectionSticker(fiche.id, {
++        section: sectionKey,
++        quantite: quantite!,
++      }),
++    onSuccess: () =>
++      queryClient.invalidateQueries({
++        queryKey: ["section-stickers", fiche.id],
++      }),
++  });
++  const submit = (e: FormEvent) => {
++    e.preventDefault();
++    if (quantite !== null) mutation.mutate();
++  };
++  return (
++    <form className="ed-stk-quote" onSubmit={submit}>
++      <label>
++        Nombre de stickers
++        <input
++          type="number"
++          inputMode="numeric"
++          min={1}
++          max={MAX_STICKERS}
++          step={1}
++          value={raw}
++          onChange={e => setRaw(e.target.value)}
++          aria-invalid={quantite === null}
++        />
++      </label>
++      <button
++        className="ed-add-b"
++        type="submit"
++        disabled={quantite === null || mutation.isPending}
++      >
++        {mutation.isPending
++          ? "Envoi…"
++          : retry
++            ? "Refaire une demande de devis"
++            : "Demander un devis"}
++      </button>
++      {quantite === null && (
++        <small role="alert">
++          Indiquez un nombre entre 1 et {MAX_STICKERS}.
++        </small>
++      )}
++      {mutation.isError && (
++        <small role="alert" className="ed-stk-err">
++          {toApiError(mutation.error).message}
++        </small>
++      )}
++    </form>
++  );
++}
++
++/** Outils d'une section ACTIVÉE par l'administration : lien, QR, aperçu et ouverture. */
++function ActiveTools({
+   fiche,
+   info,
+   previewSection,
+@@ -45,18 +126,11 @@ function StickerRow({
+     }
+   };
+   return (
+-    <li className="ed-stk">
++    <div className="ed-stk-active">
+       <div className="ed-stk-qr" ref={qr}>
+         <QR text={url} logo={fiche.logo} size={84} />
+       </div>
+       <div className="ed-stk-t">
+-        <b>
+-          <I n={TAB_TYPES[info.tab.type].icon} s={13} />{" "}
+-          {sectionTitle(info.tab)}
+-        </b>
+-        {info.primary && (
+-          <small className="ed-stk-rec">Conseillée pour votre secteur</small>
+-        )}
+         <code>{stickerPath(fiche.slug, info.key)}</code>
+         <span className="ed-stk-a">
+           <button className="ed-add-b" onClick={copy}>
+@@ -84,55 +158,139 @@ function StickerRow({
+           </a>
+         </span>
+       </div>
++    </div>
++  );
++}
++
++function StickerRow({
++  fiche,
++  info,
++  demande,
++  previewSection,
++  onPreviewSection,
++}: {
++  fiche: FicheRecord;
++  info: StickerSectionInfo;
++  demande: ApiSectionSticker | undefined;
++} & Preview) {
++  const statut = demande?.statut;
++  return (
++    <li className="ed-stk" data-statut={statut ?? "aucune"}>
++      <div className="ed-stk-body">
++        <b>
++          <I n={TAB_TYPES[info.tab.type].icon} s={13} />{" "}
++          {sectionTitle(info.tab)}
++        </b>
++        {info.primary && (
++          <small className="ed-stk-rec">Conseillée pour votre secteur</small>
++        )}
++
++        {statut === "active" ? (
++          <ActiveTools
++            fiche={fiche}
++            info={info}
++            previewSection={previewSection}
++            onPreviewSection={onPreviewSection}
++          />
++        ) : statut === "demande" ? (
++          <p className="ed-stk-state">
++            <span className="ed-stk-badge">Demande envoyée</span>{" "}
++            {stickersLabel(demande!.quantite)} · en attente de l’administration.
++            Vous serez prévenu dès que la section sera activée.
++          </p>
++        ) : (
++          <>
++            {statut === "refusee" && (
++              <p className="ed-stk-state">
++                <span className="ed-stk-badge bad">Demande refusée</span> Vous
++                pouvez en refaire une.
++              </p>
++            )}
++            {statut === "desactivee" && (
++              <p className="ed-stk-state">
++                <span className="ed-stk-badge bad">Section désactivée</span> par
++                l’administration. Vous pouvez refaire une demande.
++              </p>
++            )}
++            <QuoteForm
++              fiche={fiche}
++              sectionKey={info.key}
++              retry={statut === "refusee" || statut === "desactivee"}
++            />
++          </>
++        )}
++      </div>
+     </li>
+   );
+ }
+ 
+ /**
+- * Stickers par section (Pro et Signature) : un QR par section de la fiche. Au scan, seule cette section
+- * s'affiche (page /s/:slug/:section), avec un bouton vers la fiche complète. La fiche elle-même n'est pas modifiée.
++ * Stickers par section (Pro et Signature). Le client demande un DEVIS pour un nombre de stickers ; l'administration
++ * traite la demande et active la section. Une fois activée, il obtient le lien, le QR, l'aperçu et l'ouverture de la
++ * page /s/:slug/:section (seule cette section s'affiche, avec un bouton vers la fiche complète).
+  */
+ export default function StickerBox({
+   fiche,
+   previewSection = null,
+   onPreviewSection,
+ }: { fiche: FicheRecord } & Partial<Preview>) {
++  const eligible = hasStickers(fiche);
+   const sections = stickerSections(fiche);
++  const demandes = useQuery({
++    queryKey: ["section-stickers", fiche.id],
++    queryFn: () => getSectionStickers(fiche.id),
++    enabled: eligible,
++  });
++  const latest = latestBySection(demandes.data ?? []);
+   return (
+     <details className="ed-box">
+       <summary>
+         Stickers par section <small>Pro et Signature</small>
+       </summary>
+-      {!hasStickers(fiche) ? (
++      {!eligible ? (
+         <Lock to="Pro">
+           Un sticker peut ouvrir une seule section (le menu, vos biens…) au lieu
+           de la fiche entière. Réservé aux formules Pro et Signature.
+         </Lock>
+       ) : sections.length === 0 ? (
+         <p className="ed-hint">
+-          Ajoutez au moins une section visible à votre fiche pour créer un
+-          sticker.
++          Ajoutez au moins une section visible à votre fiche pour demander des
++          stickers.
+         </p>
+       ) : (
+         <>
+           <p className="ed-hint">
+-            Chaque QR ouvre uniquement la section choisie, avec votre logo,
+-            votre nom et un bouton vers la fiche complète. Si la section est
+-            masquée ou supprimée, c’est la fiche complète qui s’affiche. «
+-            Aperçu » l’affiche dans le téléphone, avec vos modifications non
+-            enregistrées.
++            Un sticker ouvre une seule section de votre fiche, avec votre logo,
++            votre nom et un bouton vers la fiche complète. Indiquez le nombre de
++            stickers souhaité : l’administration vous répond par un devis puis
++            active la section. Le lien et le QR apparaissent alors ici.
+           </p>
+-          <ul className="ed-stk-list">
+-            {sections.map(info => (
+-              <StickerRow
+-                key={info.key}
+-                fiche={fiche}
+-                info={info}
+-                previewSection={previewSection}
+-                onPreviewSection={onPreviewSection}
+-              />
+-            ))}
+-          </ul>
++          {demandes.isError && (
++            <p className="ed-hint" role="alert">
++              Impossible de charger vos demandes.{" "}
++              <button className="ed-up" onClick={() => demandes.refetch()}>
++                Réessayer
++              </button>
++            </p>
++          )}
++          {demandes.isPending ? (
++            <p className="ed-hint" role="status">
++              Chargement de vos demandes…
++            </p>
++          ) : (
++            <ul className="ed-stk-list">
++              {sections.map(info => (
++                <StickerRow
++                  key={info.key}
++                  fiche={fiche}
++                  info={info}
++                  demande={latest.get(info.key)}
++                  previewSection={previewSection}
++                  onPreviewSection={onPreviewSection}
++                />
++              ))}
++            </ul>
++          )}
+         </>
+       )}
+     </details>
+diff --git a/src/features/espace-client/components/ownerTools.test.tsx b/src/features/espace-client/components/ownerTools.test.tsx
+index 36d952b..e37493c 100644
+--- a/src/features/espace-client/components/ownerTools.test.tsx
++++ b/src/features/espace-client/components/ownerTools.test.tsx
+@@ -158,7 +158,18 @@ describe("PublicFichePage : qui voit les outils", () => {
+         ),
+       );
+     });
+-    for (let i = 0; i < 6; i++)
++    // La page publique affiche un chargeur d'au moins 1 s : on attend la fiche (ou l'erreur) plutôt qu'un nombre de tours.
++    const deadline = Date.now() + 4000;
++    while (
++      Date.now() < deadline &&
++      !/Fiche de contact|Fiche introuvable|Fiche indisponible/.test(
++        host.textContent ?? "",
++      )
++    ) {
++      await act(async () => void (await new Promise(r => setTimeout(r, 40))));
++    }
++    // laisse ensuite le temps à la requête « mes fiches » (propriétaire) de se terminer
++    for (let i = 0; i < 8; i++)
+       await act(async () => void (await new Promise(r => setTimeout(r, 0))));
+     return host.textContent ?? "";
+   };
+diff --git a/src/features/espace-client/components/signatureTemplate.test.tsx b/src/features/espace-client/components/signatureTemplate.test.tsx
+index c9f26f7..7b98a8e 100644
+--- a/src/features/espace-client/components/signatureTemplate.test.tsx
++++ b/src/features/espace-client/components/signatureTemplate.test.tsx
+@@ -2,6 +2,7 @@
+ import { act, createElement as h } from "react";
+ import { createRoot } from "react-dom/client";
+ import { renderToString } from "react-dom/server";
++import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { MemoryRouter } from "react-router-dom";
+ import { describe, expect, it } from "vitest";
+ import { hasLegacyEssentialTemplate, resolveHeader } from "../../../lib/plans";
+@@ -31,8 +32,10 @@ const legacy = (): FicheRecord => {
+     },
+   };
+ };
++const withQuery = (el: ReturnType<typeof h>) =>
++  h(QueryClientProvider, { client: new QueryClient() }, el);
+ const html = (el: ReturnType<typeof h>) =>
+-  renderToString(h(MemoryRouter, null, el));
++  renderToString(withQuery(h(MemoryRouter, null, el)));
+ const themeOf = (s: string) =>
+   /fiche[^"]* th-(or|clair|bleu|nuit)/.exec(s)?.[1];
+ 
+@@ -60,10 +63,12 @@ describe("Editor : première modification d'une fiche à l'ancien modèle", () =
+     const received: FicheRecord[] = [];
+     act(() =>
+       root.render(
+-        h(
+-          MemoryRouter,
+-          null,
+-          h(Editor, { fiche: legacy(), onChange: f => received.push(f) }),
++        withQuery(
++          h(
++            MemoryRouter,
++            null,
++            h(Editor, { fiche: legacy(), onChange: f => received.push(f) }),
++          ),
+         ),
+       ),
+     );
+diff --git a/src/features/espace-client/components/sticker/StickerSection.css b/src/features/espace-client/components/sticker/StickerSection.css
+index 56bf0b4..fa2c212 100644
+--- a/src/features/espace-client/components/sticker/StickerSection.css
++++ b/src/features/espace-client/components/sticker/StickerSection.css
+@@ -76,3 +76,6 @@
+ .ss-foot a {
+   color: var(--acc);
+ }
++
++/* Aperçu dans un mini téléphone (éditeur, administration) : la page occupe la hauteur de l'écran du téléphone */
++.fiche-preview-device-in .ss { min-height: 100%; }
+diff --git a/src/features/espace-client/components/sticker/StickerSectionView.tsx b/src/features/espace-client/components/sticker/StickerSectionView.tsx
+index 252066f..98cdfd7 100644
+--- a/src/features/espace-client/components/sticker/StickerSectionView.tsx
++++ b/src/features/espace-client/components/sticker/StickerSectionView.tsx
+@@ -6,18 +6,24 @@ import StickerSection from "./StickerSection";
+ 
+ /**
+  * Choisit ce qu'affiche /s/:slug/:section : la section demandée si elle existe et si la formule y a droit,
+- * sinon la fiche complète (formule sans stickers, section masquée, supprimée ou inconnue).
++ * sinon la fiche complète (formule sans stickers, section masquée, supprimée, inconnue ou pas activée).
++ * Seule une section ACTIVÉE par l'administration est servie au public ; `preview` lève cette exigence.
+  */
+ export default function StickerSectionView({
+   fiche,
+   section,
+   scrollerRef,
++  preview = false,
+ }: {
+   fiche: FicheRecord;
+   section: string;
+   scrollerRef?: RefObject<HTMLDivElement>;
++  /** Aperçu (administration, éditeur) : n'exige pas que la section soit activée. */
++  preview?: boolean;
+ }) {
+-  const resolved = resolveStickerSection(fiche, section);
++  const resolved = resolveStickerSection(fiche, section, {
++    requireActive: !preview,
++  });
+   if ("tab" in resolved)
+     return <StickerSection fiche={fiche} tab={resolved.tab} />;
+   return <Fiche key={fiche.id} fiche={fiche} scrollerRef={scrollerRef} />;
+diff --git a/src/features/espace-client/components/sticker/sticker.test.tsx b/src/features/espace-client/components/sticker/sticker.test.tsx
+index 20316e4..d96431c 100644
+--- a/src/features/espace-client/components/sticker/sticker.test.tsx
++++ b/src/features/espace-client/components/sticker/sticker.test.tsx
+@@ -7,8 +7,9 @@ import { renderToString } from "react-dom/server";
+ import { MemoryRouter, Route, Routes } from "react-router-dom";
+ import { afterEach, beforeEach, describe, expect, it } from "vitest";
+ import { api } from "../../../../lib/api";
++import { visibleTabs } from "../../../../lib/plans";
+ import { FICHES } from "../../../../test/fixtures/fiches";
+-import StickerBox from "../editor/sections/StickerBox";
++import { sectionKey } from "../../lib/stickerSections";
+ import StickerSectionPage from "../../pages/StickerSectionPage";
+ import StickerSectionView from "./StickerSectionView";
+ 
+@@ -16,8 +17,12 @@ import StickerSectionView from "./StickerSectionView";
+   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+ ).IS_REACT_ACT_ENVIRONMENT = true;
+ 
+-const fiche = (slug: string) =>
+-  structuredClone(FICHES.find(f => f.slug === slug)!);
++/** Fiche de test dont toutes les sections visibles sont activées par l'administration. */
++const fiche = (slug: string) => {
++  const f = structuredClone(FICHES.find(f => f.slug === slug)!);
++  f.stickerSections = visibleTabs(f).map(sectionKey);
++  return f;
++};
+ const render = (
+   el: Parameters<typeof h>[0] extends never ? never : ReturnType<typeof h>,
+ ) => renderToString(h(MemoryRouter, null, el));
+@@ -50,80 +55,31 @@ describe("StickerSectionView", () => {
+     expect(html).not.toContain("Voir la fiche complète");
+   });
+ 
+-  it("retombe sur la fiche complète si la section est masquée", () => {
++  it("section pas encore activée par l'administration : le visiteur voit la fiche complète", () => {
+     const f = fiche("le-sunset");
+-    f.data.onglets = f.data.onglets!.map(t =>
+-      t.type === "menu" ? { ...t, visible: false } : t,
+-    );
++    f.stickerSections = []; // demande de devis envoyée, rien d'activé
+     const html = render(h(StickerSectionView, { fiche: f, section: "menu" }));
+     expect(html).toContain("f-hero");
++    expect(html).not.toContain("Voir la fiche complète");
+   });
+-});
+ 
+-describe("StickerBox (éditeur)", () => {
+-  it("propose un lien et un QR par section, la section du secteur en premier", () => {
+-    const html = render(h(StickerBox, { fiche: fiche("le-sunset") }));
+-    expect(html).toContain("/s/le-sunset/menu");
+-    expect(html).toContain("Conseillée pour votre secteur");
+-    expect(html.indexOf("/s/le-sunset/menu")).toBeLessThan(
+-      html.indexOf("/s/le-sunset/horaires"),
++  it("l'aperçu (preview) montre la section même non activée", () => {
++    const f = fiche("le-sunset");
++    f.stickerSections = [];
++    const html = render(
++      h(StickerSectionView, { fiche: f, section: "menu", preview: true }),
+     );
++    expect(html).toContain("Voir la fiche complète");
++    expect(html).not.toContain("f-hero");
+   });
+ 
+-  it("est verrouillé pour la formule Essentielle", () => {
+-    const html = render(h(StickerBox, { fiche: fiche("awa-ndiaye") }));
+-    expect(html).toContain("ed-lock");
+-    expect(html).not.toContain("/s/awa-ndiaye");
+-  });
+-});
+-
+-describe("StickerBox : aperçu dans le téléphone", () => {
+-  const mountBox = (props: Record<string, unknown>) => {
+-    const host = document.createElement("div");
+-    const root = createRoot(host);
+-    act(() =>
+-      root.render(
+-        h(
+-          MemoryRouter,
+-          null,
+-          h(StickerBox, { fiche: fiche("le-sunset"), ...props }),
+-        ),
+-      ),
++  it("retombe sur la fiche complète si la section est masquée", () => {
++    const f = fiche("le-sunset");
++    f.data.onglets = f.data.onglets!.map(t =>
++      t.type === "menu" ? { ...t, visible: false } : t,
+     );
+-    return { host, unmount: () => act(() => root.unmount()) };
+-  };
+-  const buttons = (host: HTMLElement, label: string) =>
+-    [...host.querySelectorAll("button")].filter(b => b.textContent === label);
+-
+-  it("« Aperçu » demande l'affichage de la section choisie", () => {
+-    const calls: (string | null)[] = [];
+-    const { host, unmount } = mountBox({
+-      previewSection: null,
+-      onPreviewSection: (k: string | null) => calls.push(k),
+-    });
+-    const first = buttons(host, "Aperçu")[0];
+-    act(() => first.click());
+-    expect(calls).toEqual(["menu"]); // la section du secteur est en premier
+-    unmount();
+-  });
+-
+-  it("la section affichée propose « Fermer l'aperçu » et le ferme (null)", () => {
+-    const calls: (string | null)[] = [];
+-    const { host, unmount } = mountBox({
+-      previewSection: "menu",
+-      onPreviewSection: (k: string | null) => calls.push(k),
+-    });
+-    const close = buttons(host, "Fermer l’aperçu")[0];
+-    expect(close.getAttribute("aria-pressed")).toBe("true");
+-    act(() => close.click());
+-    expect(calls).toEqual([null]);
+-    unmount();
+-  });
+-
+-  it("sans gestionnaire (hors éditeur), aucun bouton d'aperçu", () => {
+-    const { host, unmount } = mountBox({});
+-    expect(buttons(host, "Aperçu")).toHaveLength(0);
+-    unmount();
++    const html = render(h(StickerSectionView, { fiche: f, section: "menu" }));
++    expect(html).toContain("f-hero");
+   });
+ });
+ 
+diff --git a/src/features/espace-client/components/tabs.test.tsx b/src/features/espace-client/components/tabs.test.tsx
+index cd77a50..17ac569 100644
+--- a/src/features/espace-client/components/tabs.test.tsx
++++ b/src/features/espace-client/components/tabs.test.tsx
+@@ -1,6 +1,7 @@
+ // @vitest-environment jsdom
+ import { createElement as h } from "react";
+ import { renderToString } from "react-dom/server";
++import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { MemoryRouter } from "react-router-dom";
+ import { describe, expect, it } from "vitest";
+ import { TAB_TYPES, planOf } from "../../../lib/plans";
+@@ -18,7 +19,14 @@ import SectionBody from "./fiche/SectionBody";
+ */
+ const render = (
+   el: Parameters<typeof h>[0] extends never ? never : ReturnType<typeof h>,
+-) => renderToString(h(MemoryRouter, null, el));
++) =>
++  renderToString(
++    h(
++      QueryClientProvider,
++      { client: new QueryClient() }, // l'éditeur contient le bloc des stickers, qui interroge le serveur
++      h(MemoryRouter, null, el),
++    ),
++  );
+ const noop = () => {};
+ const types = Object.keys(TAB_TYPES) as TabType[];
+ const tabOf = (type: TabType): Onglet => ({
+diff --git a/src/features/espace-client/espaceClient.service.ts b/src/features/espace-client/espaceClient.service.ts
+index d79a7b0..3c572b7 100644
+--- a/src/features/espace-client/espaceClient.service.ts
++++ b/src/features/espace-client/espaceClient.service.ts
+@@ -1,7 +1,7 @@
+ // create fiche
+ import { api } from "../../lib/api";
+ import { toApiError } from "../../lib/apiError";
+-import type { ApiFicheSummary, PlanType } from "../../types";
++import type { ApiFicheSummary, ApiSectionSticker, PlanType } from "../../types";
+ import type { SubscriptionKpi } from "./pages/SubscriptionPage";
+ 
+ export async function createFiche(data: any) {
+@@ -63,6 +63,26 @@ export type CardRequestInput = {
+   notesClient?: string;
+ };
+ 
++/** Demandes de stickers « par section » d'une fiche (les plus récentes d'abord). */
++export async function getSectionStickers(ficheId: number): Promise<ApiSectionSticker[]> {
++  const response = await api.get<{ demandes: ApiSectionSticker[] }>(
++    `fiches/${ficheId}/section-stickers`,
++  );
++  return response.data.demandes;
++}
++
++/** Demande de devis : N stickers ouvrant cette section. L'administration l'active ensuite. */
++export async function createSectionSticker(
++  ficheId: number,
++  input: { section: string; quantite: number; message?: string },
++): Promise<ApiSectionSticker> {
++  const response = await api.post<{ demande: ApiSectionSticker }>(
++    `fiches/${ficheId}/section-stickers`,
++    input,
++  );
++  return response.data.demande;
++}
++
+ /** Modèle de carte (recto / verso) défini par l'administration pour la formule de la fiche. */
+ export type CardModelPreview = {
+   id: number;
+diff --git a/src/features/espace-client/lib/ficheApi.ts b/src/features/espace-client/lib/ficheApi.ts
+index ac1a368..69257d8 100644
+--- a/src/features/espace-client/lib/ficheApi.ts
++++ b/src/features/espace-client/lib/ficheApi.ts
+@@ -38,6 +38,7 @@ export function toFicheRecord(dto: ApiFicheDetail): FicheRecord {
+     formule: dto.formule.toLowerCase() as Formule,
+     planCapabilities: dto.planCapabilities ?? null,
+     expiree: dto.expiree ?? false,
++    stickerSections: dto.stickerSections ?? [],
+     statut: dto.statut.toLowerCase(),
+     enLigneSeule: dto.enLigneSeule,
+     prenom: dto.prenom ?? "",
+diff --git a/src/features/espace-client/lib/stickerSections.test.ts b/src/features/espace-client/lib/stickerSections.test.ts
+index 5169921..a388647 100644
+--- a/src/features/espace-client/lib/stickerSections.test.ts
++++ b/src/features/espace-client/lib/stickerSections.test.ts
+@@ -1,5 +1,6 @@
+ import { describe, expect, it } from "vitest";
+ import type { FicheRecord, Onglet } from "../../../types";
++import { visibleTabs } from "../../../lib/plans";
+ import { FICHES } from "../../../test/fixtures/fiches";
+ import {
+   hasStickers,
+@@ -9,8 +10,12 @@ import {
+   stickerSections,
+ } from "./stickerSections";
+ 
+-const bySlug = (slug: string): FicheRecord =>
+-  structuredClone(FICHES.find(f => f.slug === slug)!);
++/** Fiche de test dont TOUTES les sections visibles sont activées par l'administration (cas le plus simple). */
++const bySlug = (slug: string): FicheRecord => {
++  const f = structuredClone(FICHES.find(f => f.slug === slug)!);
++  f.stickerSections = visibleTabs(f).map(sectionKey);
++  return f;
++};
+ const restaurant = () => bySlug("le-sunset"); // signature, secteur restaurant
+ const immo = () => bySlug("teranga-immo"); // signature, secteur immobilier
+ const pro = () => bySlug("mamadou-diop"); // pro
+@@ -79,6 +84,49 @@ describe("resolveStickerSection", () => {
+   });
+ });
+ 
++describe("activation par l'administration", () => {
++  it("une section non activée n'est PAS servie : repli sur la fiche complète", () => {
++    const f = restaurant();
++    f.stickerSections = ["horaires"]; // seule « horaires » est activée
++    expect(resolveStickerSection(f, "menu")).toEqual({ fallback: "inactive" });
++    const r = resolveStickerSection(f, "horaires");
++    expect("tab" in r && r.tab.type).toBe("horaires");
++  });
++
++  it("aucune section activée (ou serveur sans ce champ) : rien n'est servi", () => {
++    const f = restaurant();
++    f.stickerSections = [];
++    expect(resolveStickerSection(f, "menu")).toEqual({ fallback: "inactive" });
++    delete f.stickerSections;
++    expect(resolveStickerSection(f, "menu")).toEqual({ fallback: "inactive" });
++  });
++
++  it("l'aperçu (administration, éditeur) montre une section même non activée", () => {
++    const f = restaurant();
++    f.stickerSections = [];
++    const r = resolveStickerSection(f, "menu", { requireActive: false });
++    expect("tab" in r && r.tab.type).toBe("menu");
++  });
++
++  it("l'aperçu ne contourne ni la formule ni une section masquée ou inconnue", () => {
++    expect(
++      resolveStickerSection(essentielle(), "presentation", {
++        requireActive: false,
++      }),
++    ).toEqual({ fallback: "plan" });
++    expect(
++      resolveStickerSection(restaurant(), "inconnue", { requireActive: false }),
++    ).toEqual({ fallback: "missing" });
++  });
++
++  it("une section activée est reconnue aussi par l'identifiant de son onglet", () => {
++    const f = restaurant();
++    f.stickerSections = ["menu"];
++    const menu = f.data.onglets!.find(t => t.type === "menu")!;
++    expect("tab" in resolveStickerSection(f, menu.id)).toBe(true);
++  });
++});
++
+ describe("stickerSections (sections proposables)", () => {
+   it("place en premier la section du secteur : menu pour un restaurant", () => {
+     const s = stickerSections(restaurant());
+diff --git a/src/features/espace-client/lib/stickerSections.ts b/src/features/espace-client/lib/stickerSections.ts
+index 759e940..3597db3 100644
+--- a/src/features/espace-client/lib/stickerSections.ts
++++ b/src/features/espace-client/lib/stickerSections.ts
+@@ -1,5 +1,5 @@
+ import { TAB_TYPES, TEMPLATES, visibleTabs } from "../../../lib/plans";
+-import type { FicheRecord, Onglet } from "../../../types";
++import type { ApiSectionSticker, FicheRecord, Onglet } from "../../../types";
+ 
+ /*
+   Stickers « par section » : un QR collé sur une table, une vitrine… ouvre UNE section de la fiche
+@@ -30,19 +30,34 @@ export const sectionTitle = (tab: Onglet): string =>
+ 
+ export type StickerResolution =
+   | { tab: Onglet }
+-  /** On retombe sur la fiche complète : formule sans stickers, ou section masquée / supprimée / inconnue. */
+-  | { fallback: "plan" | "missing" };
++  /**
++   * On retombe sur la fiche complète : formule sans stickers, section masquée / supprimée / inconnue, ou section
++   * pas (encore) activée par l'administration.
++   */
++  | { fallback: "plan" | "missing" | "inactive" };
++
++export interface ResolveOptions {
++  /**
++   * Vrai (par défaut) : la section doit avoir été activée par l'administration. Faux : aperçu (administration, ou
++   * client dont la demande est déjà activée) : on affiche la section telle qu'elle apparaîtrait.
++   */
++  requireActive?: boolean;
++}
+ 
+ export function resolveStickerSection(
+   fiche: FicheRecord,
+   key: string,
++  { requireActive = true }: ResolveOptions = {},
+ ): StickerResolution {
+   if (!hasStickers(fiche)) return { fallback: "plan" };
+   // `visibleTabs` applique déjà les droits de la formule et écarte les onglets masqués.
+   const tab = visibleTabs(fiche).find(
+     t => t.id === key || sectionKey(t) === key,
+   );
+-  return tab ? { tab } : { fallback: "missing" };
++  if (!tab) return { fallback: "missing" };
++  if (requireActive && !fiche.stickerSections?.includes(sectionKey(tab)))
++    return { fallback: "inactive" };
++  return { tab };
+ }
+ 
+ export interface StickerSectionInfo {
+@@ -65,3 +80,33 @@ export function stickerSections(fiche: FicheRecord): StickerSectionInfo[] {
+   }));
+   return [...infos.filter(i => i.primary), ...infos.filter(i => !i.primary)];
+ }
++
++/* ───────── Demandes de devis (nombre de stickers) ───────── */
++
++export const MAX_STICKERS = 500;
++export const DEFAULT_STICKERS = 10;
++
++/** Nombre de stickers saisi : entier de 1 à 500, sinon null. */
++export function parseQuantity(raw: string): number | null {
++  if (!/^\d{1,4}$/.test(raw.trim())) return null;
++  const n = Number(raw.trim());
++  return n >= 1 && n <= MAX_STICKERS ? n : null;
++}
++
++/** Dernière demande de chaque section (on ne suppose pas l'ordre renvoyé par le serveur). */
++export function latestBySection(
++  demandes: ApiSectionSticker[],
++): Map<string, ApiSectionSticker> {
++  const latest = new Map<string, ApiSectionSticker>();
++  for (const d of demandes) {
++    const current = latest.get(d.section);
++    if (
++      !current ||
++      d.createdAt > current.createdAt ||
++      (d.createdAt === current.createdAt && d.id > current.id)
++    ) {
++      latest.set(d.section, d);
++    }
++  }
++  return latest;
++}
+diff --git a/src/features/espace-client/pages/EditorPage.tsx b/src/features/espace-client/pages/EditorPage.tsx
+index 0bec34c..f3a82ef 100644
+--- a/src/features/espace-client/pages/EditorPage.tsx
++++ b/src/features/espace-client/pages/EditorPage.tsx
+@@ -247,6 +247,7 @@ function FicheEditor({ id }: { id: string }) {
+                   key={`${draft.slug}-${previewSection}`}
+                   fiche={draft}
+                   section={previewSection}
++                  preview
+                   scrollerRef={scroller}
+                 />
+               ) : (
+diff --git a/src/features/espace-client/pages/FichePage.tsx b/src/features/espace-client/pages/FichePage.tsx
+index 9b8024d..1e11602 100644
+--- a/src/features/espace-client/pages/FichePage.tsx
++++ b/src/features/espace-client/pages/FichePage.tsx
+@@ -1,10 +1,11 @@
+ import { useQuery } from "@tanstack/react-query";
+ import { isAxiosError } from "axios";
+-import { useEffect, useRef, useState } from "react";
++import { useEffect, useState } from "react";
+ import { Link, useParams } from "react-router-dom";
+ import { api } from "../../../lib/api";
+ import { CardRequestPanel } from "../components/CardRequestPanel";
+ import Fiche from "../components/Fiche";
++import PhonePreview from "../components/PhonePreview";
+ import { fetchFiche } from "../lib/ficheApi";
+ import "./FicheStats.css";
+ 
+@@ -482,7 +483,6 @@ function FicheDashboardPanel({
+ export function FichePage() {
+   const { id } = useParams<{ id: string }>();
+   const ficheId = Number(id);
+-  const phoneScroller = useRef<HTMLDivElement>(null);
+ 
+   const {
+     data: fiche,
+@@ -562,18 +562,16 @@ export function FichePage() {
+         </a>
+       </div>
+       <div className="fiche-preview-layout">
+-        <div className="fiche-preview-stage">
+-          <div className="fiche-preview-device">
+-            <div className="fiche-preview-device-in" ref={phoneScroller}>
+-              <Fiche
+-                key={fiche.id}
+-                fiche={fiche}
+-                scrollerRef={phoneScroller}
+-                ownerTools
+-              />
+-            </div>
+-          </div>
+-        </div>
++        <PhonePreview>
++          {scroller => (
++            <Fiche
++              key={fiche.id}
++              fiche={fiche}
++              scrollerRef={scroller}
++              ownerTools
++            />
++          )}
++        </PhonePreview>
+         <FicheDashboardPanel
+           ficheId={fiche.id}
+           formula={fiche.formule}
+diff --git a/src/styles/admin.css b/src/styles/admin.css
+index 0f394f6..0237ed7 100644
+--- a/src/styles/admin.css
++++ b/src/styles/admin.css
+@@ -330,3 +330,11 @@
+ .adm .mc-others li { padding-top: 14px; border-top: 1px solid var(--line, #e3dfd8); }
+ .adm .mc-name { display: block; font-weight: 600; margin-bottom: 6px; }
+ .adm .mc-check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
++
++/* Stickers par section (administration) */
++.adm .ss-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
++.adm .fd-prev { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; }
++.adm .fd-ss { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
++.adm .fd-ss li { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--gris-l); }
++.adm .adm-link { background: none; border: 0; padding: 0; color: var(--rouge); cursor: pointer; text-decoration: underline; }
++@media (max-width: 1100px) { .adm .fd-prev { grid-template-columns: minmax(0, 1fr); } }
+diff --git a/src/types/admin.ts b/src/types/admin.ts
+index d33bb91..89cbbf5 100644
+--- a/src/types/admin.ts
++++ b/src/types/admin.ts
+@@ -1,3 +1,4 @@
++import type { ApiSectionSticker } from "./api";
+ // Formes des réponses de l'API (voir admin.service.ts). L'API parle en minuscules : "pro", "active".
+ export type Formule = "essentielle" | "pro" | "signature";
+ export type Statut = "active" | "suspendue";
+@@ -464,3 +465,10 @@ export interface CreateModeleCarteInput {
+   actif?: boolean;
+ }
+ export type PatchModeleCarteInput = Partial<Pick<ModeleCarte, "nom" | "rectoUrl" | "versoUrl" | "actif">>;
++
++/** Demande de stickers par section, vue administration (fiche et client joints). */
++export interface SectionStickerAdmin extends ApiSectionSticker {
++  updatedAt: string;
++  fiche: { id: number; slug: string; prenom: string; nom: string; entreprise: string | null };
++  client: { id: number; nom: string | null; email: string } | null;
++}
+diff --git a/src/types/api.ts b/src/types/api.ts
+index ce86097..2efd77d 100644
+--- a/src/types/api.ts
++++ b/src/types/api.ts
+@@ -29,6 +29,8 @@ export interface ApiFicheDetail {
+   planCapabilities?: Plan | null;
+   statut: string;
+   expiree?: boolean;
++  /** Sections de stickers activées par l'administration (absent sur un ancien serveur). */
++  stickerSections?: string[];
+   enLigneSeule: boolean;
+   prenom: string;
+   nom: string;
+@@ -100,3 +102,18 @@ export interface ApiFicheSummary {
+     plan: { type: PlanType; nom: string };
+   } | null;
+ }
++
++/** Cycle d'une demande de stickers « par section » : l'administration l'ACTIVE, la désactive ou la refuse. */
++export type SectionStickerStatus = "demande" | "active" | "desactivee" | "refusee";
++
++/** GET /fiches/:id/section-stickers : une demande de devis du client (nombre de stickers pour une section). */
++export interface ApiSectionSticker {
++  id: number;
++  /** Clé de la section dans l'adresse /s/:slug/:section (type d'onglet, ou identifiant d'un onglet personnalisé). */
++  section: string;
++  quantite: number;
++  message: string | null;
++  statut: SectionStickerStatus;
++  createdAt: string;
++  activatedAt: string | null;
++}
+diff --git a/src/types/fiche.ts b/src/types/fiche.ts
+index b66953d..18b21d1 100644
+--- a/src/types/fiche.ts
++++ b/src/types/fiche.ts
+@@ -180,6 +180,8 @@ export interface FicheRecord {
+   formule: Formule;
+   planCapabilities?: Plan | null;
+   expiree?: boolean;
++  /** Sections de stickers ACTIVÉES par l'administration : seules celles-ci sont servies en page /s/:slug/:section. */
++  stickerSections?: string[];
+   statut: string;
+   enLigneSeule: boolean;
+   prenom: string;
+-- 
+2.43.0
+
