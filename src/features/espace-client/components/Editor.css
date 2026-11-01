@@ -907,3 +907,15 @@
 .edp-prev-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: center; margin: 0 0 10px; font-size: 13px; }
 .edp-prev-bar button { padding: 4px 10px; border-radius: 999px; border: 1px solid currentColor; background: none; color: inherit; cursor: pointer; }
 .device-in .ss { min-height: 100%; }
+
+/* Stickers par section : demande de devis */
+.ed-stk-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
+.ed-stk-quote { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; margin-top: 4px; }
+.ed-stk-quote label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.ed-stk-quote input[type="number"] { width: 96px; }
+.ed-stk-quote small { flex-basis: 100%; }
+.ed-stk-err { color: #a11225; }
+.ed-stk-state { margin: 4px 0 0; font-size: 13px; }
+.ed-stk-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #f3ead2; color: #7a5b12; }
+.ed-stk-badge.bad { background: #f8dde0; color: #a11225; }
+.ed-stk-active { display: flex; gap: 12px; align-items: flex-start; margin-top: 4px; }

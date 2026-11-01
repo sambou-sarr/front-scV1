@@ -1,5 +1,5 @@
 import { TAB_TYPES, TEMPLATES, visibleTabs } from "../../../lib/plans";
-import type { FicheRecord, Onglet } from "../../../types";
+import type { ApiSectionSticker, FicheRecord, Onglet } from "../../../types";
 
 /*
   Stickers « par section » : un QR collé sur une table, une vitrine… ouvre UNE section de la fiche
@@ -30,19 +30,34 @@ export const sectionTitle = (tab: Onglet): string =>
 
 export type StickerResolution =
   | { tab: Onglet }
-  /** On retombe sur la fiche complète : formule sans stickers, ou section masquée / supprimée / inconnue. */
-  | { fallback: "plan" | "missing" };
+  /**
+   * On retombe sur la fiche complète : formule sans stickers, section masquée / supprimée / inconnue, ou section
+   * pas (encore) activée par l'administration.
+   */
+  | { fallback: "plan" | "missing" | "inactive" };
+
+export interface ResolveOptions {
+  /**
+   * Vrai (par défaut) : la section doit avoir été activée par l'administration. Faux : aperçu (administration, ou
+   * client dont la demande est déjà activée) : on affiche la section telle qu'elle apparaîtrait.
+   */
+  requireActive?: boolean;
+}
 
 export function resolveStickerSection(
   fiche: FicheRecord,
   key: string,
+  { requireActive = true }: ResolveOptions = {},
 ): StickerResolution {
   if (!hasStickers(fiche)) return { fallback: "plan" };
   // `visibleTabs` applique déjà les droits de la formule et écarte les onglets masqués.
   const tab = visibleTabs(fiche).find(
     t => t.id === key || sectionKey(t) === key,
   );
-  return tab ? { tab } : { fallback: "missing" };
+  if (!tab) return { fallback: "missing" };
+  if (requireActive && !fiche.stickerSections?.includes(sectionKey(tab)))
+    return { fallback: "inactive" };
+  return { tab };
 }
 
 export interface StickerSectionInfo {
@@ -64,4 +79,34 @@ export function stickerSections(fiche: FicheRecord): StickerSectionInfo[] {
     primary: tab.type === primaryType,
   }));
   return [...infos.filter(i => i.primary), ...infos.filter(i => !i.primary)];
+}
+
+/* ───────── Demandes de devis (nombre de stickers) ───────── */
+
+export const MAX_STICKERS = 500;
+export const DEFAULT_STICKERS = 10;
+
+/** Nombre de stickers saisi : entier de 1 à 500, sinon null. */
+export function parseQuantity(raw: string): number | null {
+  if (!/^\d{1,4}$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  return n >= 1 && n <= MAX_STICKERS ? n : null;
+}
+
+/** Dernière demande de chaque section (on ne suppose pas l'ordre renvoyé par le serveur). */
+export function latestBySection(
+  demandes: ApiSectionSticker[],
+): Map<string, ApiSectionSticker> {
+  const latest = new Map<string, ApiSectionSticker>();
+  for (const d of demandes) {
+    const current = latest.get(d.section);
+    if (
+      !current ||
+      d.createdAt > current.createdAt ||
+      (d.createdAt === current.createdAt && d.id > current.id)
+    ) {
+      latest.set(d.section, d);
+    }
+  }
+  return latest;
 }

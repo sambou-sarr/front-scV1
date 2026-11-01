@@ -7,8 +7,9 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { api } from "../../../../lib/api";
+import { visibleTabs } from "../../../../lib/plans";
 import { FICHES } from "../../../../test/fixtures/fiches";
-import StickerBox from "../editor/sections/StickerBox";
+import { sectionKey } from "../../lib/stickerSections";
 import StickerSectionPage from "../../pages/StickerSectionPage";
 import StickerSectionView from "./StickerSectionView";
 
@@ -16,8 +17,12 @@ import StickerSectionView from "./StickerSectionView";
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const fiche = (slug: string) =>
-  structuredClone(FICHES.find(f => f.slug === slug)!);
+/** Fiche de test dont toutes les sections visibles sont activées par l'administration. */
+const fiche = (slug: string) => {
+  const f = structuredClone(FICHES.find(f => f.slug === slug)!);
+  f.stickerSections = visibleTabs(f).map(sectionKey);
+  return f;
+};
 const render = (
   el: Parameters<typeof h>[0] extends never ? never : ReturnType<typeof h>,
 ) => renderToString(h(MemoryRouter, null, el));
@@ -50,6 +55,24 @@ describe("StickerSectionView", () => {
     expect(html).not.toContain("Voir la fiche complète");
   });
 
+  it("section pas encore activée par l'administration : le visiteur voit la fiche complète", () => {
+    const f = fiche("le-sunset");
+    f.stickerSections = []; // demande de devis envoyée, rien d'activé
+    const html = render(h(StickerSectionView, { fiche: f, section: "menu" }));
+    expect(html).toContain("f-hero");
+    expect(html).not.toContain("Voir la fiche complète");
+  });
+
+  it("l'aperçu (preview) montre la section même non activée", () => {
+    const f = fiche("le-sunset");
+    f.stickerSections = [];
+    const html = render(
+      h(StickerSectionView, { fiche: f, section: "menu", preview: true }),
+    );
+    expect(html).toContain("Voir la fiche complète");
+    expect(html).not.toContain("f-hero");
+  });
+
   it("retombe sur la fiche complète si la section est masquée", () => {
     const f = fiche("le-sunset");
     f.data.onglets = f.data.onglets!.map(t =>
@@ -57,73 +80,6 @@ describe("StickerSectionView", () => {
     );
     const html = render(h(StickerSectionView, { fiche: f, section: "menu" }));
     expect(html).toContain("f-hero");
-  });
-});
-
-describe("StickerBox (éditeur)", () => {
-  it("propose un lien et un QR par section, la section du secteur en premier", () => {
-    const html = render(h(StickerBox, { fiche: fiche("le-sunset") }));
-    expect(html).toContain("/s/le-sunset/menu");
-    expect(html).toContain("Conseillée pour votre secteur");
-    expect(html.indexOf("/s/le-sunset/menu")).toBeLessThan(
-      html.indexOf("/s/le-sunset/horaires"),
-    );
-  });
-
-  it("est verrouillé pour la formule Essentielle", () => {
-    const html = render(h(StickerBox, { fiche: fiche("awa-ndiaye") }));
-    expect(html).toContain("ed-lock");
-    expect(html).not.toContain("/s/awa-ndiaye");
-  });
-});
-
-describe("StickerBox : aperçu dans le téléphone", () => {
-  const mountBox = (props: Record<string, unknown>) => {
-    const host = document.createElement("div");
-    const root = createRoot(host);
-    act(() =>
-      root.render(
-        h(
-          MemoryRouter,
-          null,
-          h(StickerBox, { fiche: fiche("le-sunset"), ...props }),
-        ),
-      ),
-    );
-    return { host, unmount: () => act(() => root.unmount()) };
-  };
-  const buttons = (host: HTMLElement, label: string) =>
-    [...host.querySelectorAll("button")].filter(b => b.textContent === label);
-
-  it("« Aperçu » demande l'affichage de la section choisie", () => {
-    const calls: (string | null)[] = [];
-    const { host, unmount } = mountBox({
-      previewSection: null,
-      onPreviewSection: (k: string | null) => calls.push(k),
-    });
-    const first = buttons(host, "Aperçu")[0];
-    act(() => first.click());
-    expect(calls).toEqual(["menu"]); // la section du secteur est en premier
-    unmount();
-  });
-
-  it("la section affichée propose « Fermer l'aperçu » et le ferme (null)", () => {
-    const calls: (string | null)[] = [];
-    const { host, unmount } = mountBox({
-      previewSection: "menu",
-      onPreviewSection: (k: string | null) => calls.push(k),
-    });
-    const close = buttons(host, "Fermer l’aperçu")[0];
-    expect(close.getAttribute("aria-pressed")).toBe("true");
-    act(() => close.click());
-    expect(calls).toEqual([null]);
-    unmount();
-  });
-
-  it("sans gestionnaire (hors éditeur), aucun bouton d'aperçu", () => {
-    const { host, unmount } = mountBox({});
-    expect(buttons(host, "Aperçu")).toHaveLength(0);
-    unmount();
   });
 });
 

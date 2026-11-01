@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../admin.service';
+import { SectionStickersTab } from '../components/SectionStickers';
 import { Badge, Btn, Empty, ErrorBox, Icon, Kpi, Loading, Modal, Tabs, useAction, useToast } from '../components/ui';
 import { useData } from '../hooks/useData';
 import { NouvelleCarteModal, NouveauStickerModal } from '../components/ProductionModals';
@@ -46,13 +47,14 @@ export default function Production() {
   const [cartes, rC, eC] = useData(() => adminApi.listCartes());
   const [stickers, rS, eS] = useData(() => adminApi.listStickers());
   const [qr, rQ, eQ] = useData(() => adminApi.listQr());
-  const [tab, setTab] = useState<'cartes' | 'fonction' | 'telephone' | 'qr'>('cartes');
+  const [sec, rSec, eSec] = useData(() => adminApi.listSectionStickers());
+  const [tab, setTab] = useState<'cartes' | 'fonction' | 'telephone' | 'qr' | 'sections'>('cartes');
   const [vue, setVue] = useState<Vue | null>(null), [creation, setCreation] = useState<Creation>(null), [busy, setBusy] = useState<string | null>(null);
   const run = useAction();
 
   console.log(cartes)
 
-  const refresh = () => { rSum(); rC(); rS(); rQ(); };
+  const refresh = () => { rSum(); rC(); rS(); rQ(); rSec(); };
   const err = eSum || eC || eS || eQ;
   if (err) return <ErrorBox message={err} onRetry={refresh} />;
   if (!sum || !cartes || !stickers || !qr) return <Loading />;
@@ -79,7 +81,7 @@ export default function Production() {
         <Kpi icon="zap" label="QR dynamiques sans cible" value={sum.qrSansCible} sub="à régler avant impression" tone={sum.qrSansCible ? 'down' : undefined} onClick={() => setTab('qr')} />
         <Kpi icon="eye" label="Scans des QR dynamiques" value={sum.scansQr} sub="cumul" />
       </section>
-      <Tabs value={tab} onChange={setTab} tabs={[['cartes', 'Cartes · Evolis', cartes.cartes.length], ['fonction', 'Stickers à fonction', fonc.length], ['telephone', 'Stickers 30 mm', tel.length], ['qr', 'QR dynamiques', qr.qr.length]]} />
+      <Tabs value={tab} onChange={setTab} tabs={[['cartes', 'Cartes · Evolis', cartes.cartes.length], ['fonction', 'Stickers à fonction', fonc.length], ['telephone', 'Stickers 30 mm', tel.length], ['qr', 'QR dynamiques', qr.qr.length], ['sections', 'Stickers par section', (sec?.demandes ?? []).filter((d) => d.statut === 'demande').length]]} />
 
       {tab === 'cartes' && (cartes.cartes.length ? <div className="table-wrap"><table className="adm-tbl">
         <thead><tr><th>Client</th><th>Carte</th><th>Puce NFC : adresse à encoder</th><th>Fichiers 300 dpi</th><th>Statut</th></tr></thead>
@@ -132,6 +134,7 @@ export default function Production() {
             <td data-l="Statut">{statutSelect(x.statut, SS, (s) => setSticker(x, s))}</td>
           </tr>))}</tbody></table></div> : <Empty>Aucun sticker 30 mm.</Empty>)}
 
+      {tab === 'sections' && <SectionStickersTab data={sec?.demandes ?? null} error={eSec} onChanged={refresh} />}
       {tab === 'qr' && (qr.qr.length ? <div className="table-wrap"><table className="adm-tbl">
         <thead><tr><th>Code</th><th>Sticker</th><th>Cible (modifiable à distance)</th><th>Actif</th><th>Scans</th></tr></thead>
         <tbody>{qr.qr.map((q) => <QrRow key={q.code} q={q}

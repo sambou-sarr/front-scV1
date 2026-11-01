@@ -247,6 +247,7 @@ function FicheEditor({ id }: { id: string }) {
                   key={`${draft.slug}-${previewSection}`}
                   fiche={draft}
                   section={previewSection}
+                  preview
                   scrollerRef={scroller}
                 />
               ) : (

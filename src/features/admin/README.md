@@ -34,3 +34,20 @@ lien https restent affichés et peuvent être remplacés par un fichier.
 - API : `adminApi.listModelesCartes / createModeleCarte / updateModeleCarte / deleteModeleCarte`
   (`/admin/production/modeles-cartes`) ; `uploadCardImage(file)` envoie le fichier en binaire (`/images`) et renvoie son adresse.
 - Côté client, `CardRequestPanel` lit `modele` dans `GET /fiches/:id/card-request` (voir `espace-client/README.md`).
+
+## Stickers par section (demandes de devis)
+
+Le client demande un devis pour un nombre de stickers ouvrant une section de sa fiche ; l'administration **active la
+section** (c'est seulement alors qu'elle est servie au public et que le client reçoit lien et QR).
+
+- **Production › « Stickers par section »** : toutes les demandes (filtre « À traiter » par défaut) : fiche, section, nombre,
+  client, date, état. Actions : Aperçu, Activer la section, Refuser, Désactiver, Réactiver (mêmes transitions que le serveur :
+  `demande → active | refusée`, `active → désactivée`, `désactivée → active`). L'onglet gère lui-même son chargement :
+  une API pas à jour ne bloque pas le reste de la page.
+- **`/admin/fiches/:id`** : panneau « Aperçu et stickers par section » : mini téléphone (le même composant `PhonePreview` que
+  `/fiche/preview/:id`) montrant la fiche, ou une section demandée (aperçu : elle n'a pas besoin d'être activée), et les
+  demandes de cette fiche avec leurs décisions.
+- API : `adminApi.listSectionStickers({ statut?, ficheId? })`, `adminApi.setSectionStickerStatus(id, statut)`
+  (`/admin/production/section-stickers`). La fiche de l'aperçu est lue par `fiches/:id` avec la session administrateur.
+- À vérifier à l'œil : la feuille `admin.css` contient quelques règles génériques (`.adm a`, champs de formulaire) qui
+  s'appliquent aussi à la fiche affichée dans le téléphone ; elles ne devraient pas la déformer mais n'ont pas été contrôlées visuellement.

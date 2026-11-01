@@ -38,6 +38,7 @@ export function toFicheRecord(dto: ApiFicheDetail): FicheRecord {
     formule: dto.formule.toLowerCase() as Formule,
     planCapabilities: dto.planCapabilities ?? null,
     expiree: dto.expiree ?? false,
+    stickerSections: dto.stickerSections ?? [],
     statut: dto.statut.toLowerCase(),
     enLigneSeule: dto.enLigneSeule,
     prenom: dto.prenom ?? "",

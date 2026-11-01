@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FicheRecord, Onglet } from "../../../types";
+import { visibleTabs } from "../../../lib/plans";
 import { FICHES } from "../../../test/fixtures/fiches";
 import {
   hasStickers,
@@ -9,8 +10,12 @@ import {
   stickerSections,
 } from "./stickerSections";
 
-const bySlug = (slug: string): FicheRecord =>
-  structuredClone(FICHES.find(f => f.slug === slug)!);
+/** Fiche de test dont TOUTES les sections visibles sont activées par l'administration (cas le plus simple). */
+const bySlug = (slug: string): FicheRecord => {
+  const f = structuredClone(FICHES.find(f => f.slug === slug)!);
+  f.stickerSections = visibleTabs(f).map(sectionKey);
+  return f;
+};
 const restaurant = () => bySlug("le-sunset"); // signature, secteur restaurant
 const immo = () => bySlug("teranga-immo"); // signature, secteur immobilier
 const pro = () => bySlug("mamadou-diop"); // pro
@@ -76,6 +81,49 @@ describe("resolveStickerSection", () => {
     expect(resolveStickerSection(restaurant(), "n-importe-quoi")).toEqual({
       fallback: "missing",
     });
+  });
+});
+
+describe("activation par l'administration", () => {
+  it("une section non activée n'est PAS servie : repli sur la fiche complète", () => {
+    const f = restaurant();
+    f.stickerSections = ["horaires"]; // seule « horaires » est activée
+    expect(resolveStickerSection(f, "menu")).toEqual({ fallback: "inactive" });
+    const r = resolveStickerSection(f, "horaires");
+    expect("tab" in r && r.tab.type).toBe("horaires");
+  });
+
+  it("aucune section activée (ou serveur sans ce champ) : rien n'est servi", () => {
+    const f = restaurant();
+    f.stickerSections = [];
+    expect(resolveStickerSection(f, "menu")).toEqual({ fallback: "inactive" });
+    delete f.stickerSections;
+    expect(resolveStickerSection(f, "menu")).toEqual({ fallback: "inactive" });
+  });
+
+  it("l'aperçu (administration, éditeur) montre une section même non activée", () => {
+    const f = restaurant();
+    f.stickerSections = [];
+    const r = resolveStickerSection(f, "menu", { requireActive: false });
+    expect("tab" in r && r.tab.type).toBe("menu");
+  });
+
+  it("l'aperçu ne contourne ni la formule ni une section masquée ou inconnue", () => {
+    expect(
+      resolveStickerSection(essentielle(), "presentation", {
+        requireActive: false,
+      }),
+    ).toEqual({ fallback: "plan" });
+    expect(
+      resolveStickerSection(restaurant(), "inconnue", { requireActive: false }),
+    ).toEqual({ fallback: "missing" });
+  });
+
+  it("une section activée est reconnue aussi par l'identifiant de son onglet", () => {
+    const f = restaurant();
+    f.stickerSections = ["menu"];
+    const menu = f.data.onglets!.find(t => t.type === "menu")!;
+    expect("tab" in resolveStickerSection(f, menu.id)).toBe(true);
   });
 });
 

@@ -29,6 +29,8 @@ export interface ApiFicheDetail {
   planCapabilities?: Plan | null;
   statut: string;
   expiree?: boolean;
+  /** Sections de stickers activées par l'administration (absent sur un ancien serveur). */
+  stickerSections?: string[];
   enLigneSeule: boolean;
   prenom: string;
   nom: string;
@@ -99,4 +101,19 @@ export interface ApiFicheSummary {
     status?: "PENDING" | "ACTIVE" | "CANCELED" | "EXPIRED";
     plan: { type: PlanType; nom: string };
   } | null;
+}
+
+/** Cycle d'une demande de stickers « par section » : l'administration l'ACTIVE, la désactive ou la refuse. */
+export type SectionStickerStatus = "demande" | "active" | "desactivee" | "refusee";
+
+/** GET /fiches/:id/section-stickers : une demande de devis du client (nombre de stickers pour une section). */
+export interface ApiSectionSticker {
+  id: number;
+  /** Clé de la section dans l'adresse /s/:slug/:section (type d'onglet, ou identifiant d'un onglet personnalisé). */
+  section: string;
+  quantite: number;
+  message: string | null;
+  statut: SectionStickerStatus;
+  createdAt: string;
+  activatedAt: string | null;
 }

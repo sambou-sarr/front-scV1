@@ -158,7 +158,18 @@ describe("PublicFichePage : qui voit les outils", () => {
         ),
       );
     });
-    for (let i = 0; i < 6; i++)
+    // La page publique affiche un chargeur d'au moins 1 s : on attend la fiche (ou l'erreur) plutôt qu'un nombre de tours.
+    const deadline = Date.now() + 4000;
+    while (
+      Date.now() < deadline &&
+      !/Fiche de contact|Fiche introuvable|Fiche indisponible/.test(
+        host.textContent ?? "",
+      )
+    ) {
+      await act(async () => void (await new Promise(r => setTimeout(r, 40))));
+    }
+    // laisse ensuite le temps à la requête « mes fiches » (propriétaire) de se terminer
+    for (let i = 0; i < 8; i++)
       await act(async () => void (await new Promise(r => setTimeout(r, 0))));
     return host.textContent ?? "";
   };

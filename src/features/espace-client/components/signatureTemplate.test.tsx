@@ -2,6 +2,7 @@
 import { act, createElement as h } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { hasLegacyEssentialTemplate, resolveHeader } from "../../../lib/plans";
@@ -31,8 +32,10 @@ const legacy = (): FicheRecord => {
     },
   };
 };
+const withQuery = (el: ReturnType<typeof h>) =>
+  h(QueryClientProvider, { client: new QueryClient() }, el);
 const html = (el: ReturnType<typeof h>) =>
-  renderToString(h(MemoryRouter, null, el));
+  renderToString(withQuery(h(MemoryRouter, null, el)));
 const themeOf = (s: string) =>
   /fiche[^"]* th-(or|clair|bleu|nuit)/.exec(s)?.[1];
 
@@ -60,10 +63,12 @@ describe("Editor : première modification d'une fiche à l'ancien modèle", () =
     const received: FicheRecord[] = [];
     act(() =>
       root.render(
-        h(
-          MemoryRouter,
-          null,
-          h(Editor, { fiche: legacy(), onChange: f => received.push(f) }),
+        withQuery(
+          h(
+            MemoryRouter,
+            null,
+            h(Editor, { fiche: legacy(), onChange: f => received.push(f) }),
+          ),
         ),
       ),
     );

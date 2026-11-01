@@ -1,3 +1,4 @@
+import type { ApiSectionSticker } from "./api";
 // Formes des réponses de l'API (voir admin.service.ts). L'API parle en minuscules : "pro", "active".
 export type Formule = "essentielle" | "pro" | "signature";
 export type Statut = "active" | "suspendue";
@@ -464,3 +465,10 @@ export interface CreateModeleCarteInput {
   actif?: boolean;
 }
 export type PatchModeleCarteInput = Partial<Pick<ModeleCarte, "nom" | "rectoUrl" | "versoUrl" | "actif">>;
+
+/** Demande de stickers par section, vue administration (fiche et client joints). */
+export interface SectionStickerAdmin extends ApiSectionSticker {
+  updatedAt: string;
+  fiche: { id: number; slug: string; prenom: string; nom: string; entreprise: string | null };
+  client: { id: number; nom: string | null; email: string } | null;
+}

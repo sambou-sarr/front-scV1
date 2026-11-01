@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { CardRequestPanel } from "../components/CardRequestPanel";
 import Fiche from "../components/Fiche";
+import PhonePreview from "../components/PhonePreview";
 import { fetchFiche } from "../lib/ficheApi";
 import "./FicheStats.css";
 
@@ -482,7 +483,6 @@ function FicheDashboardPanel({
 export function FichePage() {
   const { id } = useParams<{ id: string }>();
   const ficheId = Number(id);
-  const phoneScroller = useRef<HTMLDivElement>(null);
 
   const {
     data: fiche,
@@ -562,18 +562,16 @@ export function FichePage() {
         </a>
       </div>
       <div className="fiche-preview-layout">
-        <div className="fiche-preview-stage">
-          <div className="fiche-preview-device">
-            <div className="fiche-preview-device-in" ref={phoneScroller}>
-              <Fiche
-                key={fiche.id}
-                fiche={fiche}
-                scrollerRef={phoneScroller}
-                ownerTools
-              />
-            </div>
-          </div>
-        </div>
+        <PhonePreview>
+          {scroller => (
+            <Fiche
+              key={fiche.id}
+              fiche={fiche}
+              scrollerRef={scroller}
+              ownerTools
+            />
+          )}
+        </PhonePreview>
         <FicheDashboardPanel
           ficheId={fiche.id}
           formula={fiche.formule}

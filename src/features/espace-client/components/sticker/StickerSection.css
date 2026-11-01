@@ -76,3 +76,6 @@
 .ss-foot a {
   color: var(--acc);
 }
+
+/* Aperçu dans un mini téléphone (éditeur, administration) : la page occupe la hauteur de l'écran du téléphone */
+.fiche-preview-device-in .ss { min-height: 100%; }

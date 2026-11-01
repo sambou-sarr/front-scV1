@@ -74,23 +74,33 @@ scanne sa fiche. Une personne qui ouvre la fiche en la scannant ne les voit pas.
 
 ## Stickers par section
 
-Un sticker (QR) peut ouvrir **une seule section** de la fiche au lieu de la fiche entière : `/s/:slug/:section`
-(`section` = type de l'onglet, ex. `menu`, `biens`, ou l'identifiant d'un onglet personnalisé).
+Un sticker (QR) ouvre **une seule section** de la fiche : `/s/:slug/:section` (`section` = type de l'onglet, ex. `menu`, ou
+l'identifiant d'un onglet personnalisé). Le parcours passe par l'administration :
+
+1. **Le client demande un devis** (bloc « Stickers par section » de l'éditeur) : il indique le **nombre de stickers** pour
+   la section voulue. Pro et Signature seulement, fiche publiée, abonnement valide.
+2. **L'administration** voit la demande (Production › « Stickers par section », ou fiche détail), regarde l'aperçu et
+   **active la section**. Elle peut aussi la refuser ou la désactiver plus tard.
+3. **Une fois la section activée**, le client voit dans l'éditeur le lien à copier, le QR (SVG), l'aperçu et « Ouvrir ».
+
+- **Seule une section activée est servie au public** : la fiche publique expose `stickerSections` (clés activées) et
+  `resolveStickerSection` retombe sur la fiche complète sinon (`fallback: "inactive"`). Abonnement échu : plus aucune
+  section servie. `preview` (`StickerSectionView`) lève l'exigence d'activation : aperçu de l'administration et de l'éditeur.
+- Une seule demande « ouverte » (à traiter ou activée) par fiche et par section ; refusée ou désactivée, elle peut être refaite.
 
 ```
-lib/stickerSections.ts                    logique PURE : droits (Pro/Signature), clé d'URL, résolution, section du secteur
+lib/stickerSections.ts                    logique PURE : droits, clé d'URL, résolution + activation, quantité, dernière demande
 pages/StickerSectionPage.tsx              /s/:slug/:section : charge la fiche, compte un passage « qr », noindex
 components/sticker/StickerSectionView.tsx choisit : la section, ou la fiche complète en repli
 components/sticker/StickerSection.tsx     logo + nom + UNE section + bouton « Voir la fiche complète »
-components/editor/sections/StickerBox.tsx liens et QR (SVG) par section, dans l'éditeur
+components/editor/sections/StickerBox.tsx devis, état de la demande, puis lien / QR / aperçu quand la section est activée
+components/PhonePreview.tsx               mini téléphone partagé (aperçu de fiche, éditeur, administration)
 ```
 
-- **Repli sur la fiche complète** : formule Essentielle, section masquée, supprimée ou inconnue.
 - **La fiche principale (`Fiche.tsx`, `fiche/`) n'est pas modifiée** : la page réutilise `fiche/SectionBody`.
-- Aucune donnée nouvelle : pas de nouvelle clé dans `FicheData`, donc pas de changement de schéma serveur.
-- Préparé pour la suite (stickers gérés comme entités, code `/q/:code`) : le sticker n'aura qu'à rediriger vers
-  `/s/:slug/:section`. Pour une section **propre au sticker** (Wi-Fi, jeu…), il faudra stocker son contenu côté API.
-- `vercel.json` : `/s/...` est servi par l'application (règle `/(.*)` → `index.html`), sans règle supplémentaire.
+- `vercel.json` : `/s/...` est servi par l'application (règle `/(.*)` → `index.html`).
+- Non couvert : une section **propre au sticker** (Wi-Fi, jeu…) : son contenu n'existe dans aucune donnée de la fiche.
+- Le détail du suivi et des statuts est dans `admin/README.md` (côté administration) et dans le README de l'API.
 
 ## Modèles : où est la référence ?
 

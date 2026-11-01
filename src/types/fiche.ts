@@ -180,6 +180,8 @@ export interface FicheRecord {
   formule: Formule;
   planCapabilities?: Plan | null;
   expiree?: boolean;
+  /** Sections de stickers ACTIVÉES par l'administration : seules celles-ci sont servies en page /s/:slug/:section. */
+  stickerSections?: string[];
   statut: string;
   enLigneSeule: boolean;
   prenom: string;

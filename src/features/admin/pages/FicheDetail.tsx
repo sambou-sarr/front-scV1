@@ -16,6 +16,7 @@ import {
   Seg,
   useAction,
 } from "../components/ui";
+import { FichePreviewPanel } from "../components/SectionStickers";
 import { useData } from "../hooks/useData";
 import {
   FORMULES,
@@ -162,6 +163,8 @@ function FicheDetail({ id }: { id: number }) {
           <Empty>Aucune coordonnée renseignée.</Empty>
         )}
       </section>
+
+      <FichePreviewPanel ficheId={id} />
 
       <section className="panel">
         <div className="panel-h">

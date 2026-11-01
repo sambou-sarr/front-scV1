@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { createElement as h } from "react";
 import { renderToString } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { TAB_TYPES, planOf } from "../../../lib/plans";
@@ -18,7 +19,14 @@ import SectionBody from "./fiche/SectionBody";
 */
 const render = (
   el: Parameters<typeof h>[0] extends never ? never : ReturnType<typeof h>,
-) => renderToString(h(MemoryRouter, null, el));
+) =>
+  renderToString(
+    h(
+      QueryClientProvider,
+      { client: new QueryClient() }, // l'éditeur contient le bloc des stickers, qui interroge le serveur
+      h(MemoryRouter, null, el),
+    ),
+  );
 const noop = () => {};
 const types = Object.keys(TAB_TYPES) as TabType[];
 const tabOf = (type: TabType): Onglet => ({

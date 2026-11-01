@@ -1,7 +1,7 @@
 // create fiche
 import { api } from "../../lib/api";
 import { toApiError } from "../../lib/apiError";
-import type { ApiFicheSummary, PlanType } from "../../types";
+import type { ApiFicheSummary, ApiSectionSticker, PlanType } from "../../types";
 import type { SubscriptionKpi } from "./pages/SubscriptionPage";
 
 export async function createFiche(data: any) {
@@ -62,6 +62,26 @@ export type CardRequestInput = {
   telephoneLivraison: string;
   notesClient?: string;
 };
+
+/** Demandes de stickers « par section » d'une fiche (les plus récentes d'abord). */
+export async function getSectionStickers(ficheId: number): Promise<ApiSectionSticker[]> {
+  const response = await api.get<{ demandes: ApiSectionSticker[] }>(
+    `fiches/${ficheId}/section-stickers`,
+  );
+  return response.data.demandes;
+}
+
+/** Demande de devis : N stickers ouvrant cette section. L'administration l'active ensuite. */
+export async function createSectionSticker(
+  ficheId: number,
+  input: { section: string; quantite: number; message?: string },
+): Promise<ApiSectionSticker> {
+  const response = await api.post<{ demande: ApiSectionSticker }>(
+    `fiches/${ficheId}/section-stickers`,
+    input,
+  );
+  return response.data.demande;
+}
 
 /** Modèle de carte (recto / verso) défini par l'administration pour la formule de la fiche. */
 export type CardModelPreview = {

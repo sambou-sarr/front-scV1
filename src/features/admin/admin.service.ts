@@ -22,6 +22,7 @@ import type {
   PatchEmplacements,
   PatchFormule,
   PatchModeleCarteInput,
+  SectionStickerAdmin,
   ProductionSummary,
   QrApercu,
   QrFormat,
@@ -182,6 +183,11 @@ export const adminApi = {
       versoUrl?: string | null;
     },
   ) => patch<{ carte: Carte }>(`/admin/production/cartes/${id}`, b),
+  // Stickers « par section » : demandes de devis des clients ; activer une demande ouvre la section en page publique
+  listSectionStickers: (q: { statut?: SectionStickerAdmin["statut"]; ficheId?: number } = {}) =>
+    get<{ demandes: SectionStickerAdmin[] }>("/admin/production/section-stickers", q),
+  setSectionStickerStatus: (id: number, statut: "active" | "desactivee" | "refusee") =>
+    patch<{ demande: SectionStickerAdmin }>(`/admin/production/section-stickers/${id}`, { statut }),
   // Modèles de carte (recto / verso affichés au client dans sa demande de carte)
   listModelesCartes: () =>
     get<{ modeles: ModeleCarte[] }>("/admin/production/modeles-cartes"),

@@ -82,6 +82,7 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
     code: "qr-code-1", url: "https://sc.example/q/qr-code-1", label: "Menu du restaurant",
     targetUrl: null, actif: true, scans: 0, lastScanAt: null, sticker: null,
   }] };
+  if (url === "/admin/production/section-stickers") return { demandes: [] };
   if (url === "/admin/qrcodes/styles") return { styles: [] };
   if (url === "/admin/relances") {
     const type = (c.params as Record<string, string> | undefined)?.type;
