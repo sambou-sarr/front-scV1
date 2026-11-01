@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { toApiError } from "../../../lib/apiError";
+import type { SectionStickerAdmin } from "../../../types/admin";
 import Fiche from "../../espace-client/components/Fiche";
 import PhonePreview from "../../espace-client/components/PhonePreview";
 import StickerSectionView from "../../espace-client/components/sticker/StickerSectionView";
 import { fetchFiche } from "../../espace-client/lib/ficheApi";
-import { toApiError } from "../../../lib/apiError";
-import type { SectionStickerAdmin } from "../../../types/admin";
 import { adminApi } from "../admin.service";
 import { useData } from "../hooks/useData";
 import { fdate } from "../lib/format";
@@ -41,7 +41,7 @@ function useDecision(onChanged: () => void) {
     if (
       await run(
         () => adminApi.setSectionStickerStatus(d.id, to),
-        DECISION_DONE[to],
+        DECISION_DONE[to]
       )
     )
       onChanged();
@@ -62,7 +62,7 @@ export function FichePhone({
       fetchFiche(`fiches/${ficheId}`).catch(e => {
         throw toApiError(e);
       }),
-    [ficheId],
+    [ficheId]
   );
   if (err) return <ErrorBox message={err} onRetry={reload} />;
   if (!fiche) return <Loading />;
@@ -221,7 +221,7 @@ export function SectionStickersTab({
 export function FichePreviewPanel({ ficheId }: { ficheId: number }) {
   const [data, reload, err] = useData(
     () => adminApi.listSectionStickers({ ficheId }),
-    [ficheId],
+    [ficheId]
   );
   const [section, setSection] = useState<string | null>(null);
   const decide = useDecision(reload);

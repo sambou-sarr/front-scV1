@@ -22,7 +22,6 @@ import type {
   PatchEmplacements,
   PatchFormule,
   PatchModeleCarteInput,
-  SectionStickerAdmin,
   ProductionSummary,
   QrApercu,
   QrFormat,
@@ -35,6 +34,7 @@ import type {
   RelanceType,
   RelancesPage,
   Revenus,
+  SectionStickerAdmin,
   Stats,
   StatutCarte,
   StatutSticker,
@@ -74,7 +74,9 @@ type Query = Record<string, string | number | boolean | undefined | null>;
 /** Paramètres de requête sans les valeurs vides (le serveur n'en veut pas). */
 const clean = (q: Query = {}): Record<string, string | number | boolean> =>
   Object.fromEntries(
-    Object.entries(q).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+    Object.entries(q).filter(
+      ([, v]) => v !== undefined && v !== null && v !== ""
+    )
   ) as Record<string, string | number | boolean>;
 
 async function call<T>(promise: Promise<AxiosResponse<T>>): Promise<T> {
@@ -97,7 +99,7 @@ const del = <T>(path: string, query?: Query) =>
 async function postBlob(
   path: string,
   body: unknown,
-  query?: Query,
+  query?: Query
 ): Promise<{ blob: Blob; filename: string | null }> {
   try {
     const res = await api.post<Blob>(path, body, {
@@ -134,7 +136,7 @@ export const adminApi = {
     b: {
       slug?: string;
       statut?: "active" | "suspendue";
-    },
+    }
   ) => patch<{ fiche: unknown }>(`/admin/fiches/${id}`, b),
   deleteFiche: (id: number, slug: string) =>
     del<{ ok: true }>(`/admin/fiches/${id}`, { confirmer: slug }),
@@ -144,16 +146,13 @@ export const adminApi = {
     post<{ subscription: Abonnement }>(`/admin/fiches/${id}/subscription`, b),
   cancelSubscription: (id: number, subId: number) =>
     post<{ subscription: unknown }>(
-      `/admin/fiches/${id}/subscriptions/${subId}/cancel`,
+      `/admin/fiches/${id}/subscriptions/${subId}/cancel`
     ),
 
   // ───── Formules (prix, remises, emplacements) ─────
   getFormules: () => get<Parametres>("/admin/formules"),
   updateFormule: (formule: string, b: PatchFormule) =>
-    patch<{ formule: FormuleReglage }>(
-      `/admin/formules/${formule}`,
-      b,
-    ),
+    patch<{ formule: FormuleReglage }>(`/admin/formules/${formule}`, b),
   updateEmplacements: (b: PatchEmplacements) =>
     patch<{ emplacements: Emplacements }>("/admin/formules/emplacements", b),
   tarifCommande: (b: CommandeInput) =>
@@ -162,7 +161,7 @@ export const adminApi = {
   // ───── Relances (renouvellements, expirées, montée en gamme) ─────
   getRelances: (
     type: RelanceType,
-    p: { jours?: number; scansMin?: number } = {},
+    p: { jours?: number; scansMin?: number } = {}
   ) => get<RelancesPage>("/admin/relances", { type, ...p }),
 
   // ───── Production (cartes NFC, stickers, QR dynamiques) ─────
@@ -181,23 +180,38 @@ export const adminApi = {
       notes?: string | null;
       rectoUrl?: string | null;
       versoUrl?: string | null;
-    },
+    }
   ) => patch<{ carte: Carte }>(`/admin/production/cartes/${id}`, b),
   // Stickers « par section » : demandes de devis des clients ; activer une demande ouvre la section en page publique
-  listSectionStickers: (q: { statut?: SectionStickerAdmin["statut"]; ficheId?: number } = {}) =>
-    get<{ demandes: SectionStickerAdmin[] }>("/admin/production/section-stickers", q),
-  setSectionStickerStatus: (id: number, statut: "active" | "desactivee" | "refusee") =>
-    patch<{ demande: SectionStickerAdmin }>(`/admin/production/section-stickers/${id}`, { statut }),
+  listSectionStickers: (
+    q: { statut?: SectionStickerAdmin["statut"]; ficheId?: number } = {}
+  ) =>
+    get<{ demandes: SectionStickerAdmin[] }>(
+      "/admin/production/section-stickers",
+      q
+    ),
+  setSectionStickerStatus: (
+    id: number,
+    statut: "active" | "desactivee" | "refusee"
+  ) =>
+    patch<{ demande: SectionStickerAdmin }>(
+      `/admin/production/section-stickers/${id}`,
+      { statut }
+    ),
   // Modèles de carte (recto / verso affichés au client dans sa demande de carte)
   listModelesCartes: () =>
     get<{ modeles: ModeleCarte[] }>("/admin/production/modeles-cartes"),
   /** Envoie une image de carte (corps binaire) ; renvoie l'adresse à mettre dans rectoUrl / versoUrl. */
   uploadCardImage: (file: File) =>
     call(
-      api.post<{ url: string }>("/admin/production/modeles-cartes/images", file, {
-        headers: { "Content-Type": file.type },
-        transformRequest: [data => data],
-      }),
+      api.post<{ url: string }>(
+        "/admin/production/modeles-cartes/images",
+        file,
+        {
+          headers: { "Content-Type": file.type },
+          transformRequest: [data => data],
+        }
+      )
     ),
   createModeleCarte: (b: CreateModeleCarteInput) =>
     post<{ modele: ModeleCarte }>("/admin/production/modeles-cartes", b),
@@ -205,12 +219,13 @@ export const adminApi = {
     patch<{ modele: ModeleCarte }>(`/admin/production/modeles-cartes/${id}`, b),
   deleteModeleCarte: (id: number) =>
     del<{ ok: true }>(`/admin/production/modeles-cartes/${id}`),
-  listStickers: () => get<{ stickers: Sticker[] }>("/admin/production/stickers"),
+  listStickers: () =>
+    get<{ stickers: Sticker[] }>("/admin/production/stickers"),
   createSticker: (b: CreateStickerInput) =>
     post<{ sticker: Sticker }>("/admin/production/stickers", b),
   updateSticker: (
     id: number,
-    b: { statut?: StatutSticker; notes?: string | null },
+    b: { statut?: StatutSticker; notes?: string | null }
   ) => patch<{ sticker: Sticker }>(`/admin/production/stickers/${id}`, b),
   listQr: () => get<{ qr: QrLien[] }>("/admin/production/qr"),
   updateQr: (code: string, b: { targetUrl?: string | null; actif?: boolean }) =>
@@ -221,8 +236,7 @@ export const adminApi = {
   qrApercu: (b: QrRenderInput) => post<QrApercu>("/admin/qrcodes/apercu", b),
   qrTelecharger: (b: QrRenderInput, format: QrFormat) =>
     postBlob("/admin/qrcodes/telecharger", b, { format }),
-  qrListStyles: () =>
-    get<{ styles: QrStyleItem[] }>("/admin/qrcodes/styles"),
+  qrListStyles: () => get<{ styles: QrStyleItem[] }>("/admin/qrcodes/styles"),
   qrGetStyle: (id: number) =>
     get<{ style: QrStyleFull }>(`/admin/qrcodes/styles/${id}`),
   qrCreateStyle: (b: { nom: string; style: QrStyle }) =>
@@ -239,12 +253,14 @@ export const adminApi = {
     limit?: number;
   }) => get<UsersPage>("/admin/users", { ...p }),
 
-  listLeads: (p: {
-    search?: string;
-    status?: LeadStatus;
-    page?: number;
-    limit?: number;
-  } = {}) => get<LeadRequestsPage>("/admin/leads", { ...p }),
+  listLeads: (
+    p: {
+      search?: string;
+      status?: LeadStatus;
+      page?: number;
+      limit?: number;
+    } = {}
+  ) => get<LeadRequestsPage>("/admin/leads", { ...p }),
   updateLeadStatus: (id: number, status: LeadStatus) =>
     patch<{ lead: LeadRequest }>(`/admin/leads/${id}`, { status }),
 };

@@ -45,6 +45,7 @@ export interface Stats {
   formules: Record<Formule, number>;
   scansTotal: number;
   clients: number;
+  demandesSticker: number;
 }
 
 export interface Abonnement {
@@ -464,11 +465,19 @@ export interface CreateModeleCarteInput {
   /** Vrai : devient le modèle affiché aux clients de cette formule (l'ancien est désactivé). */
   actif?: boolean;
 }
-export type PatchModeleCarteInput = Partial<Pick<ModeleCarte, "nom" | "rectoUrl" | "versoUrl" | "actif">>;
+export type PatchModeleCarteInput = Partial<
+  Pick<ModeleCarte, "nom" | "rectoUrl" | "versoUrl" | "actif">
+>;
 
 /** Demande de stickers par section, vue administration (fiche et client joints). */
 export interface SectionStickerAdmin extends ApiSectionSticker {
   updatedAt: string;
-  fiche: { id: number; slug: string; prenom: string; nom: string; entreprise: string | null };
+  fiche: {
+    id: number;
+    slug: string;
+    prenom: string;
+    nom: string;
+    entreprise: string | null;
+  };
   client: { id: number; nom: string | null; email: string } | null;
 }
