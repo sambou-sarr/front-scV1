@@ -27,6 +27,12 @@ export interface FicheRow {
   scansTotal: number;
   createdAt: string;
   proprietaire: Proprietaire | null;
+  demandesSticker: {
+    id: number;
+    section: string;
+    quantite: number;
+    createdAt: string;
+  }[];
 }
 export interface FichesPage {
   fiches: FicheRow[];
@@ -124,6 +130,7 @@ export interface ListFichesParams {
   statut?: string;
   formule?: string;
   expiration?: string;
+  sticker?: "demande";
   userId?: string;
   tri?: string;
   page?: number;

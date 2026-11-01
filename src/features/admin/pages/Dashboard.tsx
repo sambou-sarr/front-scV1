@@ -149,15 +149,16 @@ export default function Dashboard() {
           onClick={go("/clients")}
         />
         <Kpi
-          icon="eye"
-          label="Scans au total"
-          value={new Intl.NumberFormat("fr-FR").format(s.scansTotal)}
+          icon="qrcode"
+          label="Demandes de stickers"
+          value={new Intl.NumberFormat("fr-FR").format(s.demandesSticker)}
           sub="toutes fiches confondues"
+          onClick={go("/fiches?sticker=demande")}
         />
         <Kpi
           icon="eye"
-          label="Demandes de stickers"
-          value={new Intl.NumberFormat("fr-FR").format(s.demandesSticker)}
+          label="Scans au total"
+          value={new Intl.NumberFormat("fr-FR").format(s.scansTotal)}
           sub="toutes fiches confondues"
         />
       </section>

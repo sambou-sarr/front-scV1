@@ -26,10 +26,11 @@ const fiche = (id: number, slug: string, entreprise: string) => ({
   id, slug, nom: "Awa Ndiaye", entreprise, statut: "active", formule: "pro", expiree: false,
   dateEcheance: "2027-01-15T00:00:00Z", scansTotal: 42, createdAt: "2026-01-01T00:00:00Z",
   proprietaire: { id: 9, email: "awa@sc.sn", nom: "Awa" },
+  demandesSticker: [] as { id: number; section: string; quantite: number; createdAt: string }[],
 });
 const stats = {
   fiches: { total: 7, suspendues: 2, expirees: 1, expirentBientot: 3, sansProprietaire: 1, nouvellesSur30Jours: 5 },
-  formules: { essentielle: 1, pro: 4, signature: 2 }, scansTotal: 1234, clients: 6,
+  formules: { essentielle: 1, pro: 4, signature: 2 }, scansTotal: 1234, clients: 6, demandesSticker: 1,
 };
 const revenus = {
   encaisse: { ceMois: 50000, moisPrecedent: 40000, evolutionPct: 25 },
@@ -51,7 +52,17 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
   const url = c.url ?? "";
   if (url === "/admin/stats") return stats;
   if (url === "/admin/revenus") return revenus;
-  if (url === "/admin/fiches") return { fiches: [fiche(12, "chez-awa", "Chez Awa")], pagination: page };
+  if (url === "/admin/fiches") {
+    const params = c.params as Record<string, string> | undefined;
+    const row = fiche(12, "chez-awa", "Chez Awa");
+    if (params?.sticker === "demande") {
+      row.demandesSticker = [
+        { id: 8, section: "menu", quantite: 20, createdAt: "2026-10-29T10:00:00Z" },
+        { id: 9, section: "horaires", quantite: 5, createdAt: "2026-10-29T11:00:00Z" },
+      ];
+    }
+    return { fiches: [row], pagination: page };
+  }
   if (url === "/admin/fiches/12")
     return { fiche: { id: 12, slug: "chez-awa", nom: "Awa Ndiaye", entreprise: "Chez Awa", statut: "active", compteClientCree: true },
       abonnements: [] };
@@ -171,6 +182,43 @@ describe("pages du back-office", () => {
     await settle();
     expect(where()).toBe("/admin/fiches?statut=suspendue");
     expect(calls.filter(c => c.url === "/admin/fiches").at(-1)?.params).toMatchObject({ statut: "suspendue" });
+  });
+
+  it("le KPI des stickers ouvre les fiches avec demandes en attente", async () => {
+    act(() => root.render(app("/admin")));
+    await settle();
+    click(byText("button.kpi", "Demandes de stickers"));
+    await settle();
+    expect(where()).toBe("/admin/fiches?sticker=demande");
+    expect(calls.filter(c => c.url === "/admin/fiches").at(-1)?.params).toMatchObject({
+      sticker: "demande",
+    });
+    expect(host.textContent).not.toContain("Menu");
+    click(byText("button.adm-btn-red", "Voir sections"));
+    await settle();
+    expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Menu");
+    expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Horaires");
+    expect(host.querySelector('[role="dialog"]')?.textContent).toContain("20 stickers");
+    click(byText('[role="dialog"] button', "Ouvrir la fiche"));
+    await settle();
+    expect(where()).toBe("/admin/fiches/12");
+  });
+
+  it("permet de filtrer les demandes de stickers depuis la page Fiches", async () => {
+    act(() => root.render(app("/admin/fiches")));
+    await settle();
+    const filter = host.querySelector(
+      'select[aria-label="Demandes de stickers"]'
+    ) as HTMLSelectElement;
+    act(() => {
+      filter.value = "demande";
+      filter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+    expect(
+      calls.filter(c => c.url === "/admin/fiches").at(-1)?.params
+    ).toMatchObject({ sticker: "demande" });
+    expect(host.textContent).toContain("Voir sections");
   });
 
   it("cliquer une ligne de la liste ouvre le détail de la fiche", async () => {
