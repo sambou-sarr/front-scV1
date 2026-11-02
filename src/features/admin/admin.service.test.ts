@@ -81,6 +81,23 @@ describe("adminApi", () => {
     });
   });
 
+  it("crée un compte administrateur avec une invitation e-mail", async () => {
+    await adminApi.createAdmin({
+      nom: " Awa Ndiaye ",
+      email: "awa@example.com",
+    });
+
+    expect(calls[0]).toMatchObject({
+      method: "post",
+      url: "/admin/users/admin",
+      auth: "Bearer T",
+    });
+    expect(JSON.parse(String(calls[0].data))).toEqual({
+      nom: " Awa Ndiaye ",
+      email: "awa@example.com",
+    });
+  });
+
   it("charge les abonnements et paiements avec leurs filtres ciblés", async () => {
     await adminApi.listSubscriptions({
       formule: "signature",

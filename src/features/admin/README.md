@@ -15,6 +15,7 @@ Interface d'administration, accessible sous `/admin`. Elle réutilise le socle d
 `/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/abonnements`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/cartes`, `/admin/qrcodes`, `/admin/formules`.
 Les filtres de la liste de fiches se lisent dans l'URL : `?statut=…`, `?userId=…`.
 La page Abonnements & paiements regroupe les deux historiques avec filtres de recherche, formule, statut, période et état de la fiche (existante ou supprimée) ; elle relie chaque abonnement au paiement correspondant et inversement lorsque ces enregistrements sont associés. Les suppressions conservent le nom et le slug de la fiche dans les snapshots financiers pour identifier l’historique.
+Dans `/admin/clients`, « Ajouter un administrateur » crée un compte et envoie à son adresse un lien sécurisé valable 24 heures pour définir son mot de passe. Si l’envoi échoue, l’invitation peut être relancée avec la même adresse tant que le compte n’a pas été activé.
 Le slug se modifie uniquement avant la création du compte client associé. L'ancien bloc « Propriétaire & carte » et les actions d'attribution/transfert/retrait n'existent plus. Les codes de rattachement carte ont été supprimés faute de parcours client correspondant.
 
 ## Session

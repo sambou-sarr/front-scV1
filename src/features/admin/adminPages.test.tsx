@@ -99,7 +99,12 @@ const deletedBillingFiche = {
   email: null,
 };
 
-let calls: { url?: string; params?: Record<string, unknown> }[] = [];
+let calls: {
+  method?: string;
+  url?: string;
+  params?: Record<string, unknown>;
+  data?: unknown;
+}[] = [];
 let productionCartes: Record<string, unknown>[] = [];
 let productionStickers: Record<string, unknown>[] = [];
 const original = api.defaults.adapter;
@@ -216,6 +221,8 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
       ],
       pagination: page,
     };
+  if (url === "/admin/users/admin")
+    return { created: true, message: "Invitation administrateur envoyée." };
   if (url === "/admin/leads")
     return {
       items: [
@@ -329,8 +336,10 @@ beforeEach(() => {
   });
   api.defaults.adapter = async config => {
     calls.push({
+      method: config.method,
       url: config.url,
       params: config.params as Record<string, unknown>,
+      data: config.data,
     });
     const data = route(config);
     return { status: 200, data, statusText: "", headers: {}, config };
@@ -660,6 +669,44 @@ describe("pages du back-office", () => {
       calls.filter(c => c.url === "/admin/fiches").at(-1)?.params
     ).toMatchObject({ userId: "9" });
     expect(host.textContent).toContain("Fiches d’un client");
+  });
+
+  it("crée un administrateur depuis la page Clients et lui envoie une invitation", async () => {
+    act(() => root.render(app("/admin/clients")));
+    await settle();
+    click(byText("button.adm-btn", "Ajouter un administrateur"));
+
+    const name = host.querySelector<HTMLInputElement>(
+      'input[autocomplete="name"]'
+    )!;
+    const email = host.querySelector<HTMLInputElement>(
+      'input[autocomplete="email"]'
+    )!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(name, "Mariam Fall");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(email, "mariam@example.com");
+      email.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await settle();
+    click(byText("button.adm-btn", "Créer et inviter"));
+    await settle();
+
+    const createCall = calls.find(call => call.url === "/admin/users/admin");
+    expect(createCall?.method).toBe("post");
+    expect(JSON.parse(String(createCall?.data))).toEqual({
+      nom: "Mariam Fall",
+      email: "mariam@example.com",
+    });
+    expect(host.textContent).toContain(
+      "Invitation administrateur envoyée par e-mail.",
+    );
   });
 
   it("ouvre le paiement associé à un abonnement et filtre la liste", async () => {

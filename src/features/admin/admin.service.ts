@@ -270,6 +270,8 @@ export const adminApi = {
     page?: number;
     limit?: number;
   }) => get<UsersPage>("/admin/users", { ...p }),
+  createAdmin: (input: { nom: string; email: string }) =>
+    post<{ created: boolean; message: string }>("/admin/users/admin", input),
 
   listLeads: (
     p: {
