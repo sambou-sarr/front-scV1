@@ -29,7 +29,7 @@ import {
 } from "../lib/format";
 import AdminNotFound from "./AdminNotFound";
 
-type Dlg = null | "slug" | "activate" | "delete" | { cancel: Abonnement };
+type Dlg = null | "activate" | "delete" | { cancel: Abonnement };
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "");
 const valable = (a: Abonnement) =>
   a.statut === "active" && (!a.fin || new Date(a.fin) > new Date());
@@ -241,13 +241,6 @@ function FicheDetail({ id }: { id: number }) {
         </Btn>
       </section>
 
-      {dlg === "slug" && (
-        <SlugModal
-          slug={fiche.slug}
-          onClose={close}
-          onSave={slug => patch({ slug }, "Adresse modifiée")}
-        />
-      )}
       {dlg === "activate" && (
         <ActivateModal
           onClose={close}
@@ -297,54 +290,6 @@ function FicheDetail({ id }: { id: number }) {
         />
       )}
     </>
-  );
-}
-
-function SlugModal({
-  slug,
-  onClose,
-  onSave,
-}: {
-  slug: string;
-  onClose: () => void;
-  onSave: (s: string) => void;
-}) {
-  const [v, setV] = useState(slug);
-  return (
-    <Modal title="Modifier l’adresse" onClose={onClose}>
-      <form
-        className="form"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          onSave(v.trim());
-        }}
-      >
-        <Field
-          label="Adresse (slug)"
-          hint="L’adresse sera verrouillée après la création du compte client."
-        >
-          <input
-            autoFocus
-            required
-            minLength={3}
-            maxLength={60}
-            pattern="[a-z0-9]+(-[a-z0-9]+)*"
-            value={v}
-            onChange={e => setV(e.target.value)}
-          />
-        </Field>
-        <div className="form-a">
-          <Btn onClick={onClose}>Annuler</Btn>
-          <button
-            className="adm-btn adm-btn-red"
-            type="submit"
-            disabled={v.trim() === slug}
-          >
-            Enregistrer
-          </button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 

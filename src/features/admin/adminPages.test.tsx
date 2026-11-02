@@ -463,10 +463,10 @@ describe("pages du back-office", () => {
     expect(host.textContent).not.toContain("Retirer");
   });
 
-  it("un slug reste modifiable avant la création du compte client", async () => {
+  it("ne propose pas de modifier l’adresse de la fiche", async () => {
     act(() => root.render(app("/admin/fiches/13")));
     await settle();
-    expect(host.textContent).toContain("Modifier l’adresse");
+    expect(host.textContent).not.toContain("Modifier l’adresse");
   });
 
   it("un client ouvre la liste de ses fiches (?userId=)", async () => {

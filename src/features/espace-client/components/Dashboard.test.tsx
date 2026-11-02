@@ -163,6 +163,7 @@ describe("Dashboard deletion", () => {
     );
     await settle();
 
+    expect(host.textContent).not.toContain("Dernière modification");
     const kpis = [
       ...host.querySelectorAll<HTMLAnchorElement>(".db-kpi-link"),
     ];

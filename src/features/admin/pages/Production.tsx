@@ -9,7 +9,7 @@ import { FORMULE_TONE, ago, fdate } from '../lib/format';
 import { CARD, download, phoneStickerSVG, stickerSVG, svgDataUrl, svgToPng } from '../lib/print';
 import { qrPayload } from '../../../lib/qr';
 import type { Carte, QrLien, StatutCarte, StatutSticker, Sticker } from '../../../types/admin';
-import { FN, LBL, PS, SS, TITLE, TONE, VAL } from '../lib/production';
+import { carteStatusOptions, FN, LBL, PS, SS, TITLE, TONE, VAL } from '../lib/production';
 
 /*
   Production : tout ce qu'il faut pour imprimer, encoder, paramétrer et tester.
@@ -101,7 +101,10 @@ export default function Production() {
                 : <small className="adm-red">Verso : URL manquante</small>}
 
             </div><small>{c.rectoUrl && c.versoUrl ? 'Fichiers enregistrés' : 'URL manquante'}</small></td>
-            <td data-l="Statut">{statutSelect(c.statut, PS, (s) => setCarte(c, s))}</td>
+            <td data-l="Statut"><select aria-label={`Statut de la carte ${c.id}`} value={c.statut} onChange={(e) => setCarte(c, e.target.value as StatutCarte)}>
+              <option value={c.statut}>{PS[c.statut]}</option>
+              {carteStatusOptions(c.statut).slice(1).map((statut) => <option key={statut} value={statut}>{PS[statut]}</option>)}
+            </select></td>
           </tr>))}</tbody></table></div> : <Empty>Aucune carte à produire. Crée-en une avec « Nouvelle carte ».</Empty>)}
 
       {tab === 'fonction' && (fonc.length ? <div className="prod-list">{fonc.map((x) => { const [fl, fi] = FN[x.fonction ?? 'lien']; return (

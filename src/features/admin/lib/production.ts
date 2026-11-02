@@ -10,6 +10,10 @@ export const CARTE_TRANSITIONS: Record<StatutCarte, StatutCarte[]> = {
   livree:     ['testee'],
   annulee:    ['a_imprimer'],
 };
+export const carteStatusOptions = (status: StatutCarte): StatutCarte[] => [
+  status,
+  ...CARTE_TRANSITIONS[status],
+];
 export const CARTE_SUIVANT: Partial<Record<StatutCarte, StatutCarte>> = {
   a_imprimer: 'imprimee', imprimee: 'encodee', encodee: 'testee', testee: 'livree',
 };

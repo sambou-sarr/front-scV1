@@ -271,11 +271,6 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
     fiche => !["ok", "draft"].includes(health(fiche))
   );
 
-  const last = fiches.reduce(
-    (latest, fiche) => (fiche.updatedAt > latest ? fiche.updatedAt : latest),
-    fiches[0].updatedAt
-  );
-
   return (
     <div className="db">
       <header className="db-head">
@@ -327,11 +322,6 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           </small>
         </div>
 
-        <div className="db-kpi">
-          <span>Dernière modification</span>
-          <b className="sm">{fmtDate(last)}</b>
-          <small>sur l’ensemble de vos fiches</small>
-        </div>
         <Link
           className="db-kpi db-kpi-link"
           to="/espace-client/abonnements?expiry=expired"
