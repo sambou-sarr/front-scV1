@@ -296,6 +296,15 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .fiche-preview-layout .fiche-preview-stage {
+    position: static;
+    width: 100%;
+  }
+
+  .fiche-preview-layout .fiche-preview-device {
+    width: min(390px, 100%);
+  }
+
   .fiche-passage-panel {
     width: 100%;
     box-sizing: border-box;
