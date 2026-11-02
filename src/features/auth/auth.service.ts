@@ -69,6 +69,33 @@ export async function resendVerificationEmail(): Promise<void> {
   }
 }
 
+export async function updateCurrentProfile(payload: {
+  nom: string;
+  email: string;
+}): Promise<LoginResponse["user"]> {
+  try {
+    const res = await api.patch<{ user: LoginResponse["user"] }>(
+      "/auth/me",
+      payload,
+    );
+    return res.data.user;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function changeCurrentPassword(payload: {
+  currentPassword: string;
+  password: string;
+}): Promise<{ ok: true }> {
+  try {
+    await api.patch("/auth/me/password", payload);
+    return { ok: true };
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
 /** Prévient le serveur (avec le jeton), puis supprime la session locale quoi qu'il arrive. */
 export async function logout(): Promise<void> {
   try {

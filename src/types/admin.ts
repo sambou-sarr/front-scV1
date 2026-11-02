@@ -124,6 +124,7 @@ export interface UserRow {
   email: string;
   nom: string | null;
   role: "client" | "admin";
+  active: boolean;
   emailVerifie: boolean;
   createdAt: string;
   nbFiches: number;

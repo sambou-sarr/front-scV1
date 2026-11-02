@@ -25,6 +25,8 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: `${ADMIN_BASE}/cartes`, label: "Modèles de cartes", icon: "card" },
   { to: `${ADMIN_BASE}/qrcodes`, label: "QR codes", icon: "qr" },
   { to: `${ADMIN_BASE}/formules`, label: "Formules", icon: "sliders" },
+  { to: `${ADMIN_BASE}/historique`, label: "Journal d’activité", icon: "clock" },
+  { to: `${ADMIN_BASE}/parametres`, label: "Paramètres admin", icon: "sliders" },
 ];
 
 export default function AdminLayout({ children }: { children?: ReactNode }) {
@@ -102,7 +104,13 @@ export default function AdminLayout({ children }: { children?: ReactNode }) {
             >
               <Icon n="menu" />
             </button>
-            <span className="logo sm">S</span>
+            <img
+              src="/images/logo-noir.webp"
+              alt="Support Connecté"
+              width={104}
+              height={24}
+              className="h-6 w-[104px] object-contain"
+            />
             <b>Back-office</b>
           </div>
           <main className="content">

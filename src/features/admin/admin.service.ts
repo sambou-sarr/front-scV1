@@ -270,8 +270,19 @@ export const adminApi = {
     page?: number;
     limit?: number;
   }) => get<UsersPage>("/admin/users", { ...p }),
+  listActionLogs: (p: { page?: number; limit?: number }) =>
+    get<AdminActionLogsPage>("/admin/action-logs", p),
   createAdmin: (input: { nom: string; email: string }) =>
     post<{ created: boolean; message: string }>("/admin/users/admin", input),
+  resendAdminInvitation: (id: number) =>
+    post<{ ok: boolean }>(`/admin/users/${id}/invitation`),
+  updateAdminStatus: (id: number, active: boolean) =>
+    patch<{ ok: boolean }>(`/admin/users/${id}/status`, { active }),
+  deleteAdmin: (id: number) => del<{ ok: boolean }>(`/admin/users/${id}`),
+  getAppSettings: () =>
+    get<{ settings: AdminAppSettings }>("/admin/settings"),
+  updateAppSettings: (settings: AdminAppSettings) =>
+    patch<{ settings: AdminAppSettings }>("/admin/settings", settings),
 
   listLeads: (
     p: {
@@ -284,3 +295,35 @@ export const adminApi = {
   updateLeadStatus: (id: number, status: LeadStatus) =>
     patch<{ lead: LeadRequest }>(`/admin/leads/${id}`, { status }),
 };
+
+export interface AdminAppSettings {
+  platformName: string;
+  supportEmail: string;
+  supportPhone: string;
+  socialLinks: {
+    instagram: string;
+    facebook: string;
+    linkedin: string;
+  };
+  maintenance: boolean;
+}
+
+export interface AdminActionLog {
+  id: number;
+  adminName: string | null;
+  adminEmail: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  createdAt: string;
+}
+
+export interface AdminActionLogsPage {
+  items: AdminActionLog[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}

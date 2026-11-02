@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import type { InternalAxiosRequestConfig } from "axios";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -10,12 +11,14 @@ import RequireAdmin from "../auth/RequireAdmin";
 import AdminLayout from "./layout/AdminLayout";
 import AdminNotFound from "./pages/AdminNotFound";
 import Billing from "./pages/Billing";
+import AdminSettings from "./pages/AdminSettings";
 import Clients from "./pages/Clients";
 import Dashboard from "./pages/Dashboard";
 import FicheDetail from "./pages/FicheDetail";
 import Fiches from "./pages/Fiches";
 import Leads from "./pages/Leads";
 import Production from "./pages/Production";
+import AdminActionLogs from "./pages/AdminActionLogs";
 import QrCodes from "./pages/QrCodes";
 import Relances from "./pages/Relances";
 
@@ -214,6 +217,7 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
           email: "awa@sc.sn",
           nom: "Awa",
           role: "client",
+          active: true,
           emailVerifie: true,
           createdAt: "2026-01-01T00:00:00Z",
           nbFiches: 2,
@@ -223,6 +227,41 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
     };
   if (url === "/admin/users/admin")
     return { created: true, message: "Invitation administrateur envoyée." };
+  if (url === "/admin/settings")
+    return {
+      settings: {
+        platformName: "Support Connecté",
+        supportEmail: "support@sc.sn",
+        supportPhone: "",
+        socialLinks: { instagram: "", facebook: "", linkedin: "" },
+        maintenance: false,
+      },
+    };
+  if (url === "/admin/action-logs")
+    return {
+      items: [
+        {
+          id: 100,
+          adminName: "Root",
+          adminEmail: "root@sc.sn",
+          method: "PATCH",
+          path: "/admin/settings",
+          statusCode: 200,
+          createdAt: "2026-11-02T14:00:00.000Z",
+        },
+      ],
+      pagination: { ...page, total: 1 },
+    };
+  if (url === "/auth/me")
+    return {
+      user: {
+        id: 1,
+        email: "root@sc.sn",
+        nom: "Root",
+        role: "ADMIN",
+        emailVerified: true,
+      },
+    };
   if (url === "/admin/leads")
     return {
       items: [
@@ -325,11 +364,13 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
 
 let host: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
 beforeEach(() => {
   localStorage.clear();
   calls = [];
   productionCartes = [];
   productionStickers = [];
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   saveSession({
     token: "T",
     user: { name: "Root", email: "root@sc.sn", role: "ADMIN" },
@@ -366,30 +407,34 @@ const Where = () => {
   return <i data-testid="where">{l.pathname + l.search}</i>;
 };
 const app = (path: string) => (
-  <MemoryRouter initialEntries={[path]}>
-    <Where />
-    <Routes>
-      <Route
-        path="/admin"
-        element={
-          <RequireAdmin>
-            <AdminLayout />
-          </RequireAdmin>
-        }
-      >
-        <Route index element={<Dashboard />} />
-        <Route path="fiches" element={<Fiches />} />
-        <Route path="fiches/:id" element={<FicheDetail />} />
-        <Route path="abonnements" element={<Billing />} />
-        <Route path="clients" element={<Clients />} />
-        <Route path="demandes" element={<Leads />} />
-        <Route path="production" element={<Production />} />
-        <Route path="qrcodes" element={<QrCodes />} />
-        <Route path="relances" element={<Relances />} />
-        <Route path="*" element={<AdminNotFound />} />
-      </Route>
-    </Routes>
-  </MemoryRouter>
+  <QueryClientProvider client={queryClient}>
+    <MemoryRouter initialEntries={[path]}>
+      <Where />
+      <Routes>
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminLayout />
+            </RequireAdmin>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="fiches" element={<Fiches />} />
+          <Route path="fiches/:id" element={<FicheDetail />} />
+          <Route path="abonnements" element={<Billing />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="parametres" element={<AdminSettings />} />
+          <Route path="historique" element={<AdminActionLogs />} />
+          <Route path="demandes" element={<Leads />} />
+          <Route path="production" element={<Production />} />
+          <Route path="qrcodes" element={<QrCodes />} />
+          <Route path="relances" element={<Relances />} />
+          <Route path="*" element={<AdminNotFound />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  </QueryClientProvider>
 );
 const where = () => host.querySelector("[data-testid=where]")!.textContent;
 const click = (el: Element | null | undefined) =>
@@ -415,11 +460,24 @@ describe("pages du back-office", () => {
       "Production",
       "QR codes",
       "Formules",
+      "Journal d’activité",
     ])
       expect(byText("aside nav a", l), l).toBeTruthy();
     expect(byText("aside nav a", "Formules")?.getAttribute("href")).toBe(
       "/admin/formules"
     );
+  });
+
+  it("affiche le journal d’activité et le logo dans l’en-tête mobile", async () => {
+    act(() => root.render(app("/admin/historique")));
+    await settle();
+
+    expect(host.textContent).toContain("Journal d’activité");
+    expect(host.textContent).toContain("Paramètres de l’application");
+    expect(host.textContent).toContain("Root");
+    expect(host.querySelector('.top-mob img[alt="Support Connecté"]')?.getAttribute("src"))
+      .toBe("/images/logo-noir.webp");
+    expect(calls.some(call => call.url === "/admin/action-logs")).toBe(true);
   });
 
   it("un indicateur du tableau de bord ouvre la liste de fiches filtrée", async () => {
@@ -671,42 +729,16 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Fiches d’un client");
   });
 
-  it("crée un administrateur depuis la page Clients et lui envoie une invitation", async () => {
+  it("ouvre la gestion de l’équipe admin depuis la page Clients", async () => {
     act(() => root.render(app("/admin/clients")));
     await settle();
-    click(byText("button.adm-btn", "Ajouter un administrateur"));
-
-    const name = host.querySelector<HTMLInputElement>(
-      'input[autocomplete="name"]'
-    )!;
-    const email = host.querySelector<HTMLInputElement>(
-      'input[autocomplete="email"]'
-    )!;
-    act(() => {
-      Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )!.set!.call(name, "Mariam Fall");
-      name.dispatchEvent(new Event("input", { bubbles: true }));
-      Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )!.set!.call(email, "mariam@example.com");
-      email.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await settle();
-    click(byText("button.adm-btn", "Créer et inviter"));
+    click(byText("button.adm-btn", "Gérer l’équipe admin"));
     await settle();
 
-    const createCall = calls.find(call => call.url === "/admin/users/admin");
-    expect(createCall?.method).toBe("post");
-    expect(JSON.parse(String(createCall?.data))).toEqual({
-      nom: "Mariam Fall",
-      email: "mariam@example.com",
-    });
-    expect(host.textContent).toContain(
-      "Invitation administrateur envoyée par e-mail.",
-    );
+    expect(where()).toBe("/admin/parametres?section=team");
+    expect(host.textContent).toContain("Équipe administrateur");
+    expect(host.textContent).toContain("Inviter un administrateur");
+    expect(calls.some(call => call.url === "/admin/users")).toBe(true);
   });
 
   it("ouvre le paiement associé à un abonnement et filtre la liste", async () => {

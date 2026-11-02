@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Link,
   Outlet,
@@ -7,9 +8,10 @@ import {
   useLocation,
   useParams,
 } from "react-router-dom";
-import Footer from "./components/Footer";
 import Header from "./components/Header";
+import Footer from "./components/Footer";
 import { IconSprite } from "./components/Icons";
+import { api } from "./lib/api";
 import { SECTORS } from "./data/secteurs";
 import RequireAdmin from "./features/auth/RequireAdmin";
 import RequireAuth from "./features/auth/RequireAuth";
@@ -106,6 +108,12 @@ const AdminModelesCartes = lazy(
 );
 const AdminQrCodes = lazy(() => import("./features/admin/pages/QrCodes"));
 const AdminFormules = lazy(() => import("./features/admin/pages/Formules"));
+const AdminActionLogs = lazy(
+  () => import("./features/admin/pages/AdminActionLogs")
+);
+const AdminSettings = lazy(
+  () => import("./features/admin/pages/AdminSettings")
+);
 const AdminNotFound = lazy(
   () => import("./features/admin/pages/AdminNotFound")
 );
@@ -133,14 +141,42 @@ function ScrollToTop() {
  * Layout pour les pages publiques :
  * Header + contenu de la page (chargé à la demande) + Footer.
  */
-function PublicLayout() {
+type PublicAppSettings = {
+  platformName: string;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  socialLinks: { instagram?: string; facebook?: string; linkedin?: string };
+  maintenance: boolean;
+};
+
+function PublicLayout({ settings }: { settings?: PublicAppSettings }) {
   return (
     <>
       <Header current="" />
       <Suspense fallback={<PageWait />}>
         <Outlet />
       </Suspense>
-      {/* <Footer current="" /> */}
+      {settings && (
+        <footer className="border-t border-neutral-200 bg-white px-5 py-7 text-center text-sm text-neutral-600">
+          <p className="font-semibold text-neutral-900">{settings.platformName}</p>
+          <div className="mt-2 flex flex-wrap justify-center gap-x-5 gap-y-2">
+            {settings.supportEmail && (
+              <a href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a>
+            )}
+            {settings.supportPhone && (
+              <a href={`tel:${settings.supportPhone}`}>{settings.supportPhone}</a>
+            )}
+            {Object.entries(settings.socialLinks ?? {}).map(
+              ([network, url]) =>
+                url && (
+                  <a key={network} href={url} target="_blank" rel="noreferrer">
+                    {network[0].toUpperCase() + network.slice(1)}
+                  </a>
+                ),
+            )}
+          </div>
+        </footer>
+      )}
     </>
   );
 }
@@ -176,6 +212,52 @@ function SectorRoute() {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
+  const publicSettings = useQuery({
+    queryKey: ["public", "app-settings"],
+    queryFn: async () => {
+      const response = await api.get<{ settings: PublicAppSettings }>(
+        "/public/settings",
+      );
+      return response.data.settings;
+    },
+    staleTime: 60_000,
+  });
+  const settings = publicSettings.data;
+
+  if (settings?.maintenance && !pathname.startsWith("/admin")) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#08090a] px-5 text-center text-white">
+        <section className="max-w-xl">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-red-500">
+            {settings.platformName}
+          </p>
+          <h1 className="mt-4 text-4xl font-semibold">Maintenance en cours</h1>
+          <p className="mt-4 leading-7 text-neutral-300">
+            La plateforme est temporairement indisponible. Nous faisons le
+            nécessaire pour rétablir le service rapidement.
+          </p>
+          {(settings.supportEmail || settings.supportPhone) && (
+            <p className="mt-6 text-sm text-neutral-300">
+              Besoin d’aide ?{" "}
+              {settings.supportEmail && (
+                <a className="text-white underline" href={`mailto:${settings.supportEmail}`}>
+                  {settings.supportEmail}
+                </a>
+              )}
+              {settings.supportEmail && settings.supportPhone && " · "}
+              {settings.supportPhone && (
+                <a className="text-white underline" href={`tel:${settings.supportPhone}`}>
+                  {settings.supportPhone}
+                </a>
+              )}
+            </p>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <>
       <ScrollToTop />
@@ -186,7 +268,7 @@ export default function App() {
           <Route path="/s/:slug/:section" element={<StickerSectionPage />} />
 
           {/* Pages publiques */}
-          <Route element={<PublicLayout />}>
+          <Route element={<PublicLayout settings={settings} />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/cartes-connectees" element={<CartesPage />} />
             <Route path="/qr-smart" element={<QrSmartPage />} />
@@ -252,6 +334,8 @@ export default function App() {
             <Route path="cartes" element={<AdminModelesCartes />} />
             <Route path="qrcodes" element={<AdminQrCodes />} />
             <Route path="formules" element={<AdminFormules />} />
+            <Route path="historique" element={<AdminActionLogs />} />
+            <Route path="parametres" element={<AdminSettings />} />
             <Route path="*" element={<AdminNotFound />} />
           </Route>
 

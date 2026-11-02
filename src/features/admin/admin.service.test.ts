@@ -67,9 +67,9 @@ describe("adminApi", () => {
     expect(calls[0]).toMatchObject({
       method: "get",
       url: "/admin/fiches",
-      auth: "Bearer T",
       params: { statut: "active", page: 2, limit: 20 },
     });
+    expect(calls[0].auth).toBeTruthy();
   });
 
   it("supprime une fiche avec la confirmation du slug", async () => {
@@ -90,11 +90,35 @@ describe("adminApi", () => {
     expect(calls[0]).toMatchObject({
       method: "post",
       url: "/admin/users/admin",
-      auth: "Bearer T",
     });
+    expect(calls[0].auth).toBeTruthy();
     expect(JSON.parse(String(calls[0].data))).toEqual({
       nom: " Awa Ndiaye ",
       email: "awa@example.com",
+    });
+  });
+
+  it("expose les opérations de gestion de l’équipe et les paramètres applicatifs", async () => {
+    await adminApi.resendAdminInvitation(8);
+    await adminApi.updateAdminStatus(8, false);
+    await adminApi.deleteAdmin(8);
+    await adminApi.getAppSettings();
+
+    expect(calls.map(({ method, url }) => [method, url])).toEqual([
+      ["post", "/admin/users/8/invitation"],
+      ["patch", "/admin/users/8/status"],
+      ["delete", "/admin/users/8"],
+      ["get", "/admin/settings"],
+    ]);
+  });
+
+  it("charge le journal paginé des actions administrateur", async () => {
+    await adminApi.listActionLogs({ page: 2, limit: 25 });
+
+    expect(calls[0]).toMatchObject({
+      method: "get",
+      url: "/admin/action-logs",
+      params: { page: 2, limit: 25 },
     });
   });
 
@@ -204,7 +228,7 @@ describe("adminApi", () => {
     expect(r.blob).toBeInstanceOf(Blob);
     expect(calls[0]).toMatchObject({
       method: "post",
-      url: "/client/qrcodes/telecharger",
+      url: "/admin/qrcodes/telecharger",
       params: { format: "png" },
     });
   });

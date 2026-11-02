@@ -12,10 +12,11 @@ Interface d'administration, accessible sous `/admin`. Elle réutilise le socle d
 - Types : `src/types/admin.ts` (volontairement hors de `types/index.ts`, des noms comme `Formule` y existent déjà).
 
 ## Routes
-`/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/abonnements`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/cartes`, `/admin/qrcodes`, `/admin/formules`.
+`/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/abonnements`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/cartes`, `/admin/qrcodes`, `/admin/formules`, `/admin/historique`, `/admin/parametres`.
 Les filtres de la liste de fiches se lisent dans l'URL : `?statut=…`, `?userId=…`.
 La page Abonnements & paiements regroupe les deux historiques avec filtres de recherche, formule, statut, période et état de la fiche (existante ou supprimée) ; elle relie chaque abonnement au paiement correspondant et inversement lorsque ces enregistrements sont associés. Les suppressions conservent le nom et le slug de la fiche dans les snapshots financiers pour identifier l’historique.
-Dans `/admin/clients`, « Ajouter un administrateur » crée un compte et envoie à son adresse un lien sécurisé valable 24 heures pour définir son mot de passe. Si l’envoi échoue, l’invitation peut être relancée avec la même adresse tant que le compte n’a pas été activé.
+La page `/admin/parametres` regroupe le profil et la sécurité de l’administrateur, la gestion de l’équipe (invitations, renvoi, désactivation/réactivation et suppression), les coordonnées publiques et le mode maintenance. Le profil utilise `/auth/me`; les réglages partagés sont enregistrés via `/admin/settings`. La facturation reste dans Formules et Abonnements & paiements. Le dernier administrateur actif et le compte connecté ne peuvent pas être supprimés/désactivés.
+La page `/admin/historique` présente les actions de modification réussies, avec l’administrateur, la date et la route touchée. Les corps de requête, mots de passe et autres données de formulaires ne sont pas conservés.
 Le slug se modifie uniquement avant la création du compte client associé. L'ancien bloc « Propriétaire & carte » et les actions d'attribution/transfert/retrait n'existent plus. Les codes de rattachement carte ont été supprimés faute de parcours client correspondant.
 
 ## Session
