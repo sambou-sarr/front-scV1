@@ -22,8 +22,10 @@ describe("Tableau de bord de la fiche", () => {
   const originalAdapter = api.defaults.adapter;
   let root: Root;
   let host: HTMLDivElement;
+  let ficheExpiree = false;
 
   beforeEach(() => {
+    ficheExpiree = false;
     host = document.createElement("div");
     root = createRoot(host);
     api.defaults.adapter = async config => {
@@ -41,7 +43,7 @@ describe("Tableau de bord de la fiche", () => {
             slug: "awa-ndiaye",
             formule: "PRO",
             statut: "ACTIVE",
-            expiree: false,
+            expiree: ficheExpiree,
             enLigneSeule: false,
             prenom: "Awa",
             nom: "Ndiaye",
@@ -73,7 +75,16 @@ describe("Tableau de bord de la fiche", () => {
         });
       }
       if (config.url === "fiches/1/card-request") {
-        return response({ carte: null });
+        return response({
+          carte: null,
+          modele: {
+            id: 8,
+            tier: "pro",
+            nom: "Pro rouge",
+            rectoUrl: "https://cdn.exemple.sn/pro-recto.webp",
+            versoUrl: "https://cdn.exemple.sn/pro-verso.webp",
+          },
+        });
       }
       throw new Error(`Unexpected request: ${config.url}`);
     };
@@ -156,5 +167,33 @@ describe("Tableau de bord de la fiche", () => {
     expect(host.textContent).toContain("Demande de carte — Awa Ndiaye");
     expect(host.textContent).toContain("FCFA");
     expect(host.querySelector('textarea[required]')).toBeTruthy();
+  });
+
+  it("affiche le recto et le verso du modèle actif si la fiche a un abonnement valide", async () => {
+    await openPage();
+    await act(async () => {
+      host.querySelectorAll<HTMLButtonElement>(".fiche-dashboard-nav button")[2].click();
+    });
+    for (let i = 0; i < 6; i++) {
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+    }
+
+    expect(host.querySelector('img[alt="Pro rouge — recto"]')?.getAttribute("src"))
+      .toBe("https://cdn.exemple.sn/pro-recto.webp");
+    expect(host.querySelector('img[alt="Pro rouge — verso"]')?.getAttribute("src"))
+      .toBe("https://cdn.exemple.sn/pro-verso.webp");
+  });
+
+  it("n'affiche pas l'aperçu du modèle si l'abonnement de la fiche est expiré", async () => {
+    ficheExpiree = true;
+    await openPage();
+    await act(async () => {
+      host.querySelectorAll<HTMLButtonElement>(".fiche-dashboard-nav button")[2].click();
+    });
+
+    expect(host.querySelector(".fiche-card-model-faces")).toBeNull();
+    expect(host.querySelector('img[alt="Pro rouge — recto"]')).toBeNull();
   });
 });

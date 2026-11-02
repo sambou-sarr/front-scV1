@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../admin.service';
 import { SectionStickersTab } from '../components/SectionStickers';
@@ -38,6 +38,41 @@ function CopyLink({ text }: { text: string }) {
   const toast = useToast();
   return <button type="button" className="link small" onClick={() => navigator.clipboard.writeText(text).then(() => toast('Copié'), () => toast('Copie impossible', 'err'))}>Copier</button>;
 }
+function CardImageControls({ card, onSaved }: { card: Carte; onSaved: () => void }) {
+  const rectoInput = useRef<HTMLInputElement>(null);
+  const versoInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<'recto' | 'verso' | null>(null);
+  const run = useAction();
+  const toast = useToast();
+  const canEdit = card.statut === 'a_imprimer';
+  const upload = async (side: 'recto' | 'verso', file?: File) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast('Format non pris en charge : utilisez une image JPEG, PNG ou WebP.', 'err');
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      toast('L’image dépasse 12 Mo.', 'err');
+      return;
+    }
+    setUploading(side);
+    const result = await run(async () => {
+      const { url } = await adminApi.uploadCardImage(file);
+      return adminApi.updateCarte(card.id, side === 'recto' ? { rectoUrl: url } : { versoUrl: url });
+    }, `${side === 'recto' ? 'Recto' : 'Verso'} de la carte enregistré`);
+    setUploading(null);
+    if (result) onSaved();
+  };
+  return (
+    <div className="row-a left">
+      <input ref={rectoInput} type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label={`Fichier recto carte ${card.id}`} onChange={e => { void upload('recto', e.target.files?.[0]); e.target.value = ''; }} />
+      <input ref={versoInput} type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label={`Fichier verso carte ${card.id}`} onChange={e => { void upload('verso', e.target.files?.[0]); e.target.value = ''; }} />
+      <Btn disabled={uploading !== null || !canEdit} onClick={() => rectoInput.current?.click()}>{card.rectoUrl ? 'Remplacer' : 'Ajouter'} recto</Btn>
+      <Btn disabled={uploading !== null || !canEdit} onClick={() => versoInput.current?.click()}>{card.versoUrl ? 'Remplacer' : 'Ajouter'} verso</Btn>
+      {!canEdit && <small>Modifiables avant impression uniquement.</small>}
+    </div>
+  );
+}
 // Lien Cloudinary → même image, servie en téléchargement (sinon le navigateur l'ouvre simplement).
 const telechargeable = (url: string) => (url.includes('/image/upload/') && !url.includes('/fl_attachment') ? url.replace('/image/upload/', '/image/upload/fl_attachment/') : url);
 const client = (f: { entreprise: string; nom: string } | null) => f?.entreprise || f?.nom || '—';
@@ -51,8 +86,6 @@ export default function Production() {
   const [tab, setTab] = useState<'cartes' | 'fonction' | 'telephone' | 'qr' | 'sections'>('cartes');
   const [vue, setVue] = useState<Vue | null>(null), [creation, setCreation] = useState<Creation>(null), [busy, setBusy] = useState<string | null>(null);
   const run = useAction();
-
-  console.log(cartes)
 
   const refresh = () => { rSum(); rC(); rS(); rQ(); rSec(); };
   const err = eSum || eC || eS || eQ;
@@ -87,7 +120,12 @@ export default function Production() {
         <thead><tr><th>Client</th><th>Carte</th><th>Puce NFC : adresse à encoder</th><th>Fichiers 300 dpi</th><th>Statut</th></tr></thead>
         <tbody>{cartes.cartes.map((c) => (
           <tr key={c.id}>
-            <td data-l="Client">{c.fiche?.id ? <Link to={`/admin/fiches/${c.fiche.id}`}><b>{client(c.fiche)}</b></Link> : <b>{client(c.fiche)}</b>}<small>{c.fiche?.nom} · {fdate(c.createdAt)}</small></td>
+            <td data-l="Client">{c.fiche?.id ? <Link to={`/admin/fiches/${c.fiche.id}`}><b>{client(c.fiche)}</b></Link> : <b>{client(c.fiche)}</b>}<small>{c.fiche?.nom} · {fdate(c.createdAt)}</small>
+              {c.adresseLivraison && <small>Livraison : {c.adresseLivraison}</small>}
+              {c.telephoneLivraison && <small>Tél. livraison : {c.telephoneLivraison}</small>}
+              {c.notesClient && <small>Précisions client : {c.notesClient}</small>}
+              {c.montantFcfa != null && <small>À encaisser à la livraison : {c.montantFcfa.toLocaleString('fr-FR')} FCFA</small>}
+            </td>
             <td data-l="Carte"><Badge tone={FORMULE_TONE[c.tier]}>{c.tier}</Badge><small>/{c.fiche?.slug}</small></td>
             <td data-l="Puce NFC"><code className="nfc">{c.nfcUrl}</code><CopyLink text={c.nfcUrl} />
               {c.adresseChangee && <small className="adm-red">L’adresse de la fiche a changé : la puce déjà écrite ne mène plus à la fiche. À ré-encoder.</small>}</td>
@@ -100,7 +138,9 @@ export default function Production() {
                 ? <Btn kind="dark" icon="down" onClick={() => void window.open(telechargeable(c.versoUrl!), '_blank', 'noopener')}>Verso</Btn>
                 : <small className="adm-red">Verso : URL manquante</small>}
 
-            </div><small>{c.rectoUrl && c.versoUrl ? 'Fichiers enregistrés' : 'URL manquante'}</small></td>
+            </div><small>{c.rectoUrl && c.versoUrl ? 'Fichiers enregistrés' : 'URL manquante'}</small>
+              <CardImageControls card={c} onSaved={refresh} />
+            </td>
             <td data-l="Statut"><select aria-label={`Statut de la carte ${c.id}`} value={c.statut} onChange={(e) => setCarte(c, e.target.value as StatutCarte)}>
               <option value={c.statut}>{PS[c.statut]}</option>
               {carteStatusOptions(c.statut).slice(1).map((statut) => <option key={statut} value={statut}>{PS[statut]}</option>)}

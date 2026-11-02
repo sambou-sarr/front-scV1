@@ -99,6 +99,7 @@ const deletedBillingFiche = {
 };
 
 let calls: { url?: string; params?: Record<string, unknown> }[] = [];
+let productionCartes: Record<string, unknown>[] = [];
 const original = api.defaults.adapter;
 const route = (c: InternalAxiosRequestConfig): unknown => {
   const url = c.url ?? "";
@@ -258,7 +259,16 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
       qrSansCible: 1,
       scansQr: 0,
     };
-  if (url === "/admin/production/cartes") return { cartes: [] };
+  if (url === "/admin/production/cartes") return { cartes: productionCartes };
+  if (url === "/admin/production/modeles-cartes/images")
+    return {
+      url: "http://localhost:4000/api/media/cartes/0a1b2c3d-0000-4000-8000-000000000001.webp",
+    };
+  if (url === "/admin/production/cartes/55" && c.method === "patch") {
+    const body = JSON.parse(c.data as string) as Record<string, unknown>;
+    productionCartes = productionCartes.map(card => ({ ...card, ...body }));
+    return { carte: productionCartes[0] };
+  }
   if (url === "/admin/production/stickers") return { stickers: [] };
   if (url === "/admin/production/qr")
     return {
@@ -295,6 +305,7 @@ let root: Root;
 beforeEach(() => {
   localStorage.clear();
   calls = [];
+  productionCartes = [];
   saveSession({
     token: "T",
     user: { name: "Root", email: "root@sc.sn", role: "ADMIN" },
@@ -467,6 +478,60 @@ describe("pages du back-office", () => {
     act(() => root.render(app("/admin/fiches/13")));
     await settle();
     expect(host.textContent).not.toContain("Modifier l’adresse");
+  });
+
+  it("affiche les coordonnées de livraison et permet d'ajouter un fichier à une commande", async () => {
+    productionCartes = [
+      {
+        id: 55,
+        ficheId: 12,
+        tier: "pro",
+        nfcUrl: "https://sc.example/f/chez-awa",
+        adresseChangee: false,
+        rectoUrl: null,
+        versoUrl: null,
+        design: null,
+        encodedAt: null,
+        statut: "a_imprimer",
+        notes: null,
+        printedAt: null,
+        testedAt: null,
+        createdAt: "2026-10-01T00:00:00.000Z",
+        adresseLivraison: "Dakar, Plateau",
+        telephoneLivraison: "770000000",
+        notesClient: "Appeler à l'arrivée",
+        montantFcfa: 12000,
+        fiche: {
+          id: 12,
+          slug: "chez-awa",
+          nom: "Awa Ndiaye",
+          entreprise: "Chez Awa",
+          telephone: "770000000",
+          email: "awa@example.sn",
+          fonction: "Gérante",
+        },
+      },
+    ];
+    act(() => root.render(app("/admin/production")));
+    await settle();
+    expect(host.textContent).toContain("Livraison : Dakar, Plateau");
+    expect(host.textContent).toContain("Tél. livraison : 770000000");
+    expect(host.textContent).toContain("Appeler à l'arrivée");
+    expect(host.textContent).toContain("12 000 FCFA");
+
+    const input = host.querySelector<HTMLInputElement>(
+      'input[aria-label="Fichier recto carte 55"]'
+    )!;
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      value: [new File(["image"], "recto.png", { type: "image/png" })],
+    });
+    act(() => input.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+
+    expect(calls.some(call => call.url === "/admin/production/modeles-cartes/images")).toBe(true);
+    expect(calls.some(call => call.url === "/admin/production/cartes/55")).toBe(true);
+    expect(byText("button.adm-btn", "Remplacer recto")).toBeTruthy();
   });
 
   it("un client ouvre la liste de ses fiches (?userId=)", async () => {

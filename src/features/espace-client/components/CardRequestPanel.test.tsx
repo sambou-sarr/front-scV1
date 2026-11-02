@@ -2,8 +2,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../../lib/api";
+import type { CardRequestState } from "../espaceClient.service";
 import { CardRequestPanel } from "./CardRequestPanel";
 
 (
@@ -23,6 +24,8 @@ const carte = {
   statut: "a_imprimer",
   tier: "signature",
   montantFcfa: 15000,
+  rectoUrl: modele.rectoUrl,
+  versoUrl: modele.versoUrl,
   adresseLivraison: "Dakar",
   telephoneLivraison: "770000000",
 };
@@ -31,12 +34,17 @@ describe("CardRequestPanel : modèle de carte", () => {
   const original = api.defaults.adapter;
   let payload: Record<string, unknown>;
   let posts: Record<string, unknown>[];
+  let gets: number;
+  let fetchedStatuses: string[];
+  let queryClient: QueryClient;
   let root: Root;
   let host: HTMLDivElement;
 
   beforeEach(() => {
     payload = { carte: null, modele };
     posts = [];
+    gets = 0;
+    fetchedStatuses = [];
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
@@ -52,29 +60,36 @@ describe("CardRequestPanel : modèle de carte", () => {
         posts.push(JSON.parse(config.data));
         return mk({ carte });
       }
+      gets += 1;
+      fetchedStatuses.push(
+        (payload.carte as { statut?: string } | null)?.statut ?? "none",
+      );
       return mk(payload);
     };
   });
   afterEach(() => {
     api.defaults.adapter = original;
+    vi.useRealTimers();
     act(() => root.unmount());
     host.remove();
   });
 
   const settle = async () => {
     for (let i = 0; i < 6; i++)
-      await act(async () => void (await new Promise(r => setTimeout(r, 0))));
+      await act(async () => {
+        if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(0);
+        else await new Promise(r => setTimeout(r, 0));
+      });
   };
   const open = async (formula = "pro") => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     await act(async () =>
       root.render(
         h(
           QueryClientProvider,
-          {
-            client: new QueryClient({
-              defaultOptions: { queries: { retry: false } },
-            }),
-          },
+          { client: queryClient },
           h(CardRequestPanel, { ficheId: 1, formula }),
         ),
       ),
@@ -165,5 +180,48 @@ describe("CardRequestPanel : modèle de carte", () => {
     });
     expect(host.textContent).toContain("En attente de production");
     expect(img()?.src).toBe("https://cdn.exemple.sn/r.png"); // le modèle n'a pas disparu
+  });
+
+  it("affiche les images conservées avec la commande, pas celles du modèle actif modifié depuis", async () => {
+    payload = {
+      carte: {
+        ...carte,
+        rectoUrl: "https://cdn.exemple.sn/commande-r.png",
+        versoUrl: "https://cdn.exemple.sn/commande-v.png",
+      },
+      modele,
+    };
+    await open();
+
+    expect(img()?.src).toBe("https://cdn.exemple.sn/commande-r.png");
+    expect(host.textContent).toContain("Votre carte Signature");
+    expect(host.textContent).toContain("15");
+  });
+
+  it("recharge automatiquement le statut tant que la demande est en production", async () => {
+    vi.useFakeTimers();
+    payload = { carte, modele };
+    await open();
+    expect(host.textContent).toContain("En attente de production");
+
+    payload = { carte: { ...carte, statut: "imprimee" }, modele };
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    await settle();
+
+    expect(gets).toBeGreaterThanOrEqual(2);
+    expect(fetchedStatuses.at(-1)).toBe("imprimee");
+    expect(queryClient.getQueryData<CardRequestState>(["card-request", 1])?.carte?.statut).toBe("imprimee");
+    await act(async () =>
+      root.render(
+        h(
+          QueryClientProvider,
+          { client: queryClient },
+          h(CardRequestPanel, { ficheId: 1, formula: "pro" }),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain("Imprimée");
   });
 });

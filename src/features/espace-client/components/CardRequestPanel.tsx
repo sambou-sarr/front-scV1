@@ -177,8 +177,13 @@ function ZoomHint() {
   );
 }
 
+type CardFacesModel = Pick<CardModelPreview, "id" | "tier" | "nom"> & {
+  rectoUrl: string | null;
+  versoUrl: string | null;
+};
+
 /** Carte définie par l'administration : recto / verso, clic pour agrandir, repli si une image est cassée. */
-function CardFaces({ modele }: { modele: CardModelPreview }) {
+function CardFaces({ modele }: { modele: CardFacesModel }) {
   const [face, setFace] = useState<"recto" | "verso">("recto");
   const [broken, setBroken] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
@@ -193,7 +198,7 @@ function CardFaces({ modele }: { modele: CardModelPreview }) {
         aria-label={`Agrandir la carte ${modele.nom}`}
         className="relative block aspect-[1.586] w-full cursor-zoom-in overflow-hidden rounded-xl bg-[#f4f1ea] shadow-[0_4px_14px_rgba(0,0,0,0.12)] transition hover:shadow-[0_6px_20px_rgba(0,0,0,0.2)]"
       >
-        {broken[url] ? (
+        {!url || broken[url] ? (
           <span className="grid h-full place-items-center text-xs text-[#a11225]">
             Image indisponible
           </span>
@@ -218,7 +223,7 @@ function CardFaces({ modele }: { modele: CardModelPreview }) {
               className="aspect-[1.586] overflow-hidden rounded-2xl bg-[#f4f1ea] shadow-2xl"
               style={LARGE_CARD_STYLE}
             >
-              {broken[url] ? (
+              {!url || broken[url] ? (
                 <p className="grid h-full place-items-center text-sm text-[#a11225]">
                   Image indisponible
                 </p>
@@ -294,6 +299,10 @@ export function CardRequestPanel({
   const cardQuery = useQuery({
     queryKey: ["card-request", ficheId],
     queryFn: () => getCardRequest(ficheId),
+    refetchInterval: query => {
+      const status = query.state.data?.carte?.statut;
+      return status && !terminalStatuses.has(status) ? 30_000 : false;
+    },
   });
   const createMutation = useMutation({
     mutationFn: () =>
@@ -315,11 +324,21 @@ export function CardRequestPanel({
 
   const card = cardQuery.data?.carte;
   const modele = cardQuery.data?.modele ?? null;
+  const canRequest = !card || terminalStatuses.has(card.statut);
+  const currentOrder = card && !canRequest ? card : null;
+  const previewModel = currentOrder
+    ? {
+        id: currentOrder.id,
+        tier: currentOrder.tier,
+        nom: `Commande ${currentOrder.id}`,
+        rectoUrl: currentOrder.rectoUrl,
+        versoUrl: currentOrder.versoUrl,
+      }
+      : modele;
   // Le modèle est celui de la formule que le serveur facturera : on aligne le libellé et le prix dessus.
   const plan =
-    CARD_DETAILS[modele?.tier ?? formula.toLowerCase()] ??
+    CARD_DETAILS[currentOrder?.tier ?? modele?.tier ?? formula.toLowerCase()] ??
     CARD_DETAILS.essentielle;
-  const canRequest = !card || terminalStatuses.has(card.statut);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -359,8 +378,8 @@ export function CardRequestPanel({
       <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-[minmax(0,260px)_1fr] md:items-start">
         {/* Aperçu (cliquable pour agrandir) */}
         <div className="mx-auto w-full max-w-[280px] md:mx-0">
-          {modele ? (
-            <CardFaces modele={modele} />
+          {previewModel ? (
+            <CardFaces modele={previewModel} />
           ) : (
             <FallbackCardZoomable plan={plan} />
           )}
