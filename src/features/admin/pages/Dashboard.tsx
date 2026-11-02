@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { Stats } from "../../../types/admin";
 import { adminApi } from "../admin.service";
 import {
   Bars,
@@ -11,7 +12,6 @@ import {
 } from "../components/ui";
 import { useData } from "../hooks/useData";
 import { fcfa, fdate } from "../lib/format";
-import type { Stats } from "../../../types/admin";
 
 type ChartMode = "bars" | "line";
 type RangePreset = "7" | "30" | "90" | "365" | "custom";
@@ -23,7 +23,9 @@ const rangeFor = (days: number) => {
   const end = new Date(`${today()}T00:00:00.000Z`);
   if (days === 365) {
     return {
-      from: isoDate(new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11, 1))),
+      from: isoDate(
+        new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11, 1))
+      ),
       to: isoDate(end),
     };
   }
@@ -43,7 +45,11 @@ function periodLabel(value: string, grouping: "day" | "week" | "month") {
   const date = new Date(`${value}T00:00:00.000Z`);
   if (grouping === "month") {
     return date
-      .toLocaleDateString("fr-FR", { month: "short", year: "2-digit", timeZone: "UTC" })
+      .toLocaleDateString("fr-FR", {
+        month: "short",
+        year: "2-digit",
+        timeZone: "UTC",
+      })
       .replace(".", "");
   }
   return date.toLocaleDateString("fr-FR", {
@@ -78,15 +84,23 @@ function RecentActivity({ stats }: { stats: Stats }) {
             <div className="table-wrap">
               <table className="adm-tbl">
                 <thead>
-                  <tr><th>Client</th><th>E-mail</th><th>Inscription</th></tr>
+                  <tr>
+                    <th>Client</th>
+                    <th>E-mail</th>
+                    <th>Inscription</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {clients.map(client => (
                     <tr
                       key={client.id}
-                      onClick={() => navigate(`/admin/fiches?userId=${client.id}`)}
+                      onClick={() =>
+                        navigate(`/admin/fiches?userId=${client.id}`)
+                      }
                     >
-                      <td data-l="Client"><b>{client.nom || client.email}</b></td>
+                      <td data-l="Client">
+                        <b>{client.nom || client.email}</b>
+                      </td>
                       <td data-l="E-mail">{client.email}</td>
                       <td data-l="Inscription">{fdate(client.createdAt)}</td>
                     </tr>
@@ -94,33 +108,52 @@ function RecentActivity({ stats }: { stats: Stats }) {
                 </tbody>
               </table>
             </div>
-          ) : <Empty>Aucun client inscrit.</Empty>}
+          ) : (
+            <Empty>Aucun client inscrit.</Empty>
+          )}
         </section>
         <section className="panel">
           <div className="panel-h">
             <h2>10 derniers abonnements</h2>
-            <span className="adm-muted small">{subscriptions.length} abonnements</span>
+            <span className="adm-muted small">
+              {subscriptions.length} abonnements
+            </span>
           </div>
           {subscriptions.length ? (
             <div className="table-wrap">
               <table className="adm-tbl">
                 <thead>
-                  <tr><th>Fiche</th><th>Formule / statut</th><th>Créé le</th></tr>
+                  <tr>
+                    <th>Fiche</th>
+                    <th>Formule / statut</th>
+                    <th>Créé le</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {subscriptions.map(subscription => (
                     <tr
                       key={subscription.id}
-                      onClick={() => navigate(`/admin/abonnements?subscriptionId=${subscription.id}`)}
+                      onClick={() =>
+                        navigate(
+                          `/admin/abonnements?subscriptionId=${subscription.id}`
+                        )
+                      }
                     >
                       <td data-l="Fiche">
-                        <b>{subscription.fiche?.nom || subscription.fiche?.slug || "Fiche supprimée"}</b>
-                        {subscription.fiche?.entreprise && <small>{subscription.fiche.entreprise}</small>}
+                        <b>
+                          {subscription.fiche?.nom ||
+                            subscription.fiche?.slug ||
+                            "Fiche supprimée"}
+                        </b>
+                        {subscription.fiche?.entreprise && (
+                          <small>{subscription.fiche.entreprise}</small>
+                        )}
                       </td>
                       <td data-l="Formule / statut">
                         <b>{subscription.formule}</b>
                         <small>
-                          {subscriptionStatus[subscription.statut] ?? subscription.statut}
+                          {subscriptionStatus[subscription.statut] ??
+                            subscription.statut}
                           {subscription.montantFcfa !== null
                             ? ` · ${fcfa(subscription.montantFcfa)}`
                             : ""}
@@ -132,7 +165,9 @@ function RecentActivity({ stats }: { stats: Stats }) {
                 </tbody>
               </table>
             </div>
-          ) : <Empty>Aucun abonnement enregistré.</Empty>}
+          ) : (
+            <Empty>Aucun abonnement enregistré.</Empty>
+          )}
         </section>
       </div>
     </>
@@ -171,7 +206,9 @@ export default function Dashboard() {
   };
   const applyCustomRange = () => {
     if (!fromInput || !toInput || fromInput > toInput) {
-      setRangeError("Choisissez une date de début antérieure ou égale à la date de fin.");
+      setRangeError(
+        "Choisissez une date de début antérieure ou égale à la date de fin."
+      );
       return;
     }
     setRangeError("");
@@ -228,13 +265,15 @@ export default function Dashboard() {
         />
       </section>
 
-      <h2 className="h3">Revenus et créations</h2>
+      <h2 className="h3">Revenus </h2>
       <div className="panel dashboard-chart-controls">
         <div className="dashboard-range-control">
           <div className="dashboard-range-heading">
             <strong>Période</strong>
             <span className="dashboard-active-range" role="status">
-              {preset === "custom" ? "Période personnalisée" : `Filtre actif : ${preset} jours`}
+              {preset === "custom"
+                ? "Période personnalisée"
+                : `Filtre actif : ${preset} jours`}
             </span>
           </div>
           <div
@@ -242,23 +281,25 @@ export default function Dashboard() {
             role="group"
             aria-label="Période des graphiques"
           >
-          {([
-            ["7", "7 jours"],
-            ["30", "30 jours"],
-            ["90", "90 jours"],
-            ["365", "12 mois"],
-            ["custom", "Personnalisée"],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={preset === value ? "on" : ""}
-              aria-pressed={preset === value}
-              onClick={() => setQuickRange(value)}
-            >
-              {label}
-            </button>
-          ))}
+            {(
+              [
+                ["7", "7 jours"],
+                ["30", "30 jours"],
+                ["90", "90 jours"],
+                ["365", "12 mois"],
+                ["custom", "Personnalisée"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={preset === value ? "on" : ""}
+                aria-pressed={preset === value}
+                onClick={() => setQuickRange(value)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
         <div className="dashboard-date-range">
@@ -286,11 +327,19 @@ export default function Dashboard() {
               }}
             />
           </label>
-          <button type="button" className="adm-btn adm-btn-dark" onClick={applyCustomRange}>
+          <button
+            type="button"
+            className="adm-btn adm-btn-dark"
+            onClick={applyCustomRange}
+          >
             Appliquer
           </button>
         </div>
-        {rangeError && <p className="err" role="alert">{rangeError}</p>}
+        {rangeError && (
+          <p className="err" role="alert">
+            {rangeError}
+          </p>
+        )}
         <label className="dashboard-chart-mode">
           Type de graphique
           <select
@@ -327,12 +376,12 @@ export default function Dashboard() {
                   : undefined
               }
             />
-            <Kpi
+            {/* <Kpi
               icon="clock"
               label="Période précédente"
               value={fcfa(rev.encaisse.periodePrecedenteFcfa)}
               sub="encaissements enregistrés"
-            />
+            /> */}
             <Kpi
               icon="zap"
               label="À renouveler (30 j)"
@@ -345,23 +394,34 @@ export default function Dashboard() {
             <section className="panel">
               <div className="panel-h">
                 <h2>Encaissements</h2>
-                <span className="adm-muted small">{from} — {to}</span>
+                <span className="adm-muted small">
+                  {from} — {to}
+                </span>
               </div>
               {chartMode === "bars" ? (
                 <Bars data={incomeData} format={compact} />
               ) : (
-                <LineChart data={incomeData} format={compact} label="Encaissements par période" />
+                <LineChart
+                  data={incomeData}
+                  format={compact}
+                  label="Encaissements par période"
+                />
               )}
             </section>
             <section className="panel">
               <div className="panel-h">
                 <h2>Nouvelles fiches</h2>
-                <span className="adm-muted small">{from} — {to}</span>
+                <span className="adm-muted small">
+                  {from} — {to}
+                </span>
               </div>
               {chartMode === "bars" ? (
                 <Bars data={ficheData} />
               ) : (
-                <LineChart data={ficheData} label="Nouvelles fiches par période" />
+                <LineChart
+                  data={ficheData}
+                  label="Nouvelles fiches par période"
+                />
               )}
             </section>
           </div>
