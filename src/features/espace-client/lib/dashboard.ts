@@ -33,6 +33,21 @@ export const subscriptionEndsAt = (f: ApiFicheSummary) =>
   f.latestSubscription?.endsAt ??
   f.abonnementActif?.endsAt;
 
+const subscriptionWarningDays = (f: ApiFicheSummary) => {
+  const subscription =
+    f.subscriptions?.[0] ?? f.latestSubscription ?? f.abonnementActif;
+  const startsAt = subscription?.startsAt;
+  const endsAt = subscription?.endsAt;
+  if (!startsAt || !endsAt) return 30;
+
+  const durationDays =
+    (new Date(endsAt).getTime() - new Date(startsAt).getTime()) /
+    86_400_000;
+  if (durationDays >= 350 && durationDays <= 380) return 15;
+  if (durationDays > 0 && durationDays <= 100) return 7;
+  return 30;
+};
+
 export type Health = "ok" | "soon" | "expired" | "suspended" | "draft";
 /** Les fiches sans abonnement payant restent en ligne; une dernière échéance expirée reste signalée. */
 export function health(f: ApiFicheSummary, now = Date.now()): Health {
@@ -43,7 +58,13 @@ export function health(f: ApiFicheSummary, now = Date.now()): Health {
   if (subscription?.status && subscription.status !== "ACTIVE")
     return "expired";
   const d = daysLeft(subscriptionEndsAt(f), now);
-  return d === null ? "ok" : d < 0 ? "expired" : d <= 30 ? "soon" : "ok";
+  return d === null
+    ? "ok"
+    : d < 0
+      ? "expired"
+      : d <= subscriptionWarningDays(f)
+        ? "soon"
+        : "ok";
 }
 
 export interface Check {

@@ -84,12 +84,14 @@ export interface ApiFicheSummary {
   updatedAt: string;
   /** Abonnement actif renvoyé dans la relation subscriptions du tableau de bord. */
   subscriptions?: {
+    startsAt?: string;
     endsAt: string | null;
     status?: "PENDING" | "ACTIVE" | "CANCELED" | "EXPIRED";
     plan: { type: PlanType; nom?: string };
   }[];
   /** Dernier abonnement confirmé, y compris expiré ou annulé, pour afficher l’échéance. */
   latestSubscription?: {
+    startsAt?: string;
     endsAt: string | null;
     status: "ACTIVE" | "CANCELED" | "EXPIRED";
     /** Formule de ce dernier abonnement (permet de proposer son renouvellement). */
@@ -97,6 +99,7 @@ export interface ApiFicheSummary {
   } | null;
   /** Ancien format compatible avec les réponses déjà adaptées. */
   abonnementActif?: {
+    startsAt?: string;
     endsAt: string | null;
     status?: "PENDING" | "ACTIVE" | "CANCELED" | "EXPIRED";
     plan: { type: PlanType; nom: string };
