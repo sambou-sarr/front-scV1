@@ -79,6 +79,12 @@ const NAV: {
     match: p => p.startsWith(`${BASE}/abonnements`),
   },
   {
+    to: `${BASE}/paiements`,
+    label: "Paiements",
+    icon: "creditCard",
+    match: p => p.startsWith(`${BASE}/paiements`),
+  },
+  {
     to: `${BASE}/parametres`,
     label: "Paramètres",
     icon: "sliders",
@@ -91,6 +97,7 @@ const MOBILE_LABEL: Record<string, string> = {
   Brouillons: "Brouillons",
   "Demandes de rappel": "Rappels",
   "Abonnements & formules": "Formules",
+  Paiements: "Paiements",
   Paramètres: "Réglages",
 };
 

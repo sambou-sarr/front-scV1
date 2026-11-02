@@ -260,6 +260,49 @@ export async function getDashboardFiche(
   return response.data;
 }
 
+export type ClientPayment = {
+  id: number;
+  statut: "pending" | "succeeded" | "failed" | "cancelled";
+  formule: string;
+  formuleNom: string;
+  fournisseur: string;
+  montantFcfa: number;
+  devise: string;
+  reference: string | null;
+  motifEchec: string | null;
+  createdAt: string;
+  payeLe: string | null;
+  dureeMois: number | null;
+  fiche: {
+    id: number | null;
+    slug: string | null;
+    nom: string;
+    entreprise: string | null;
+  };
+};
+
+export type ClientPaymentList = {
+  items: ClientPayment[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export async function getClientPayments(
+  page = 1,
+  limit = 20,
+  signal?: AbortSignal
+): Promise<ClientPaymentList> {
+  const response = await api.get<ClientPaymentList>("/subscription/payments", {
+    params: { page, limit },
+    signal,
+  });
+  return response.data;
+}
+
 // get subscripton kpi
 
 export async function getKpi(): Promise<SubscriptionKpi> {

@@ -79,6 +79,9 @@ const EditorPage = lazy(
 const SubscriptionPage = lazy(
   () => import("./features/espace-client/pages/SubscriptionPage")
 );
+const PaymentsPage = lazy(
+  () => import("./features/espace-client/pages/PaymentsPage")
+);
 const SettingsPage = lazy(
   () => import("./features/espace-client/pages/SettingsPage")
 );
@@ -224,6 +227,7 @@ export default function App() {
             <Route path="editeur" element={<EditorPage />} />
             <Route path="editeur/:id" element={<EditorPage />} />
             <Route path="abonnements" element={<SubscriptionPage />} />
+            <Route path="paiements" element={<PaymentsPage />} />
             <Route path="parametres" element={<SettingsPage />} />
           </Route>
 

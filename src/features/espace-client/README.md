@@ -2,6 +2,8 @@
 
 Ce dossier contient le back-office des membres et la fiche publique ouverte par la carte NFC / le QR.
 
+La page `/espace-client/paiements` affiche l’historique paginé du client connecté. Les paiements confirmés proposent un reçu imprimable (ou enregistrable en PDF) ; les factures officielles restent désactivées tant que les informations légales de l’émetteur et les coordonnées de facturation du client ne sont pas définies.
+
 ## Organisation
 
 ```
