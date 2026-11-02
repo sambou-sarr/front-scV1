@@ -1,14 +1,37 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { adminApi } from "../admin.service";
-import { Bars, ErrorBox, Kpi, Loading } from "../components/ui";
+import {
+  Bars,
+  Empty,
+  ErrorBox,
+  Kpi,
+  LineChart,
+  Loading,
+} from "../components/ui";
 import { useData } from "../hooks/useData";
-import { fcfa } from "../lib/format";
+import { fcfa, fdate } from "../lib/format";
+import type { Stats } from "../../../types/admin";
 
-const moisCourt = (m: string) =>
-  new Date(`${m}-01T12:00:00Z`)
-    .toLocaleDateString("fr-FR", { month: "short" })
-    .replace(".", "");
-const jourMois = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+type ChartMode = "bars" | "line";
+type RangePreset = "7" | "30" | "90" | "365" | "custom";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+const today = () => isoDate(new Date());
+const rangeFor = (days: number) => {
+  const end = new Date(`${today()}T00:00:00.000Z`);
+  if (days === 365) {
+    return {
+      from: isoDate(new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11, 1))),
+      to: isoDate(end),
+    };
+  }
+  return {
+    from: isoDate(new Date(end.getTime() - (days - 1) * DAY_MS)),
+    to: isoDate(end),
+  };
+};
 const compact = (n: number) =>
   n >= 1_000_000
     ? `${+(n / 1_000_000).toFixed(1)} M`
@@ -16,14 +39,155 @@ const compact = (n: number) =>
       ? `${Math.round(n / 1000)} k`
       : String(n);
 
+function periodLabel(value: string, grouping: "day" | "week" | "month") {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (grouping === "month") {
+    return date
+      .toLocaleDateString("fr-FR", { month: "short", year: "2-digit", timeZone: "UTC" })
+      .replace(".", "");
+  }
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
+const subscriptionStatus: Record<string, string> = {
+  pending: "En attente",
+  active: "Actif",
+  expired: "Expiré",
+  canceled: "Annulé",
+};
+
+function RecentActivity({ stats }: { stats: Stats }) {
+  const navigate = useNavigate();
+  const clients = stats.derniersClients ?? [];
+  const subscriptions = stats.derniersAbonnements ?? [];
+
+  return (
+    <>
+      <h2 className="h3">Activité récente</h2>
+      <div className="grid2">
+        <section className="panel">
+          <div className="panel-h">
+            <h2>10 derniers clients inscrits</h2>
+            <span className="adm-muted small">{clients.length} comptes</span>
+          </div>
+          {clients.length ? (
+            <div className="table-wrap">
+              <table className="adm-tbl">
+                <thead>
+                  <tr><th>Client</th><th>E-mail</th><th>Inscription</th></tr>
+                </thead>
+                <tbody>
+                  {clients.map(client => (
+                    <tr
+                      key={client.id}
+                      onClick={() => navigate(`/admin/fiches?userId=${client.id}`)}
+                    >
+                      <td data-l="Client"><b>{client.nom || client.email}</b></td>
+                      <td data-l="E-mail">{client.email}</td>
+                      <td data-l="Inscription">{fdate(client.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <Empty>Aucun client inscrit.</Empty>}
+        </section>
+        <section className="panel">
+          <div className="panel-h">
+            <h2>10 derniers abonnements</h2>
+            <span className="adm-muted small">{subscriptions.length} abonnements</span>
+          </div>
+          {subscriptions.length ? (
+            <div className="table-wrap">
+              <table className="adm-tbl">
+                <thead>
+                  <tr><th>Fiche</th><th>Formule / statut</th><th>Créé le</th></tr>
+                </thead>
+                <tbody>
+                  {subscriptions.map(subscription => (
+                    <tr
+                      key={subscription.id}
+                      onClick={() => navigate(`/admin/abonnements?subscriptionId=${subscription.id}`)}
+                    >
+                      <td data-l="Fiche">
+                        <b>{subscription.fiche?.nom || subscription.fiche?.slug || "Fiche supprimée"}</b>
+                        {subscription.fiche?.entreprise && <small>{subscription.fiche.entreprise}</small>}
+                      </td>
+                      <td data-l="Formule / statut">
+                        <b>{subscription.formule}</b>
+                        <small>
+                          {subscriptionStatus[subscription.statut] ?? subscription.statut}
+                          {subscription.montantFcfa !== null
+                            ? ` · ${fcfa(subscription.montantFcfa)}`
+                            : ""}
+                        </small>
+                      </td>
+                      <td data-l="Créé le">{fdate(subscription.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <Empty>Aucun abonnement enregistré.</Empty>}
+        </section>
+      </div>
+    </>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const go = (to: string) => () => navigate(`/admin${to}`);
   const [s, reload, err] = useData(() => adminApi.stats());
-  const [rev, reloadRev, errRev] = useData(() => adminApi.getRevenus());
+  const defaultRange = rangeFor(365);
+  const [from, setFrom] = useState(defaultRange.from);
+  const [to, setTo] = useState(defaultRange.to);
+  const [fromInput, setFromInput] = useState(defaultRange.from);
+  const [toInput, setToInput] = useState(defaultRange.to);
+  const [preset, setPreset] = useState<RangePreset>("365");
+  const [chartMode, setChartMode] = useState<ChartMode>("bars");
+  const [rangeError, setRangeError] = useState("");
+  const [rev, reloadRev, errRev] = useData(
+    () => adminApi.getRevenus({ from, to }),
+    [from, to]
+  );
+
   if (err) return <ErrorBox message={err} onRetry={reload} />;
   if (!s) return <Loading />;
   const f = s.fiches;
+  const setQuickRange = (value: RangePreset) => {
+    setPreset(value);
+    setRangeError("");
+    if (value === "custom") return;
+    const range = rangeFor(Number(value));
+    setFrom(range.from);
+    setTo(range.to);
+    setFromInput(range.from);
+    setToInput(range.to);
+  };
+  const applyCustomRange = () => {
+    if (!fromInput || !toInput || fromInput > toInput) {
+      setRangeError("Choisissez une date de début antérieure ou égale à la date de fin.");
+      return;
+    }
+    setRangeError("");
+    setPreset("custom");
+    setFrom(fromInput);
+    setTo(toInput);
+  };
+  const incomeData = (rev?.encaissements ?? []).map(point => ({
+    label: rev ? periodLabel(point.periode, rev.grouping) : point.periode,
+    value: point.montantFcfa,
+  }));
+  const ficheData = (rev?.nouvellesFiches ?? []).map(point => ({
+    label: rev ? periodLabel(point.periode, rev.grouping) : point.periode,
+    value: point.nombre,
+  }));
+
   return (
     <>
       <header className="ph row">
@@ -64,7 +228,82 @@ export default function Dashboard() {
         />
       </section>
 
-      <h2 className="h3">Revenus</h2>
+      <h2 className="h3">Revenus et créations</h2>
+      <div className="panel dashboard-chart-controls">
+        <div className="dashboard-range-control">
+          <div className="dashboard-range-heading">
+            <strong>Période</strong>
+            <span className="dashboard-active-range" role="status">
+              {preset === "custom" ? "Période personnalisée" : `Filtre actif : ${preset} jours`}
+            </span>
+          </div>
+          <div
+            className="dashboard-control-group"
+            role="group"
+            aria-label="Période des graphiques"
+          >
+          {([
+            ["7", "7 jours"],
+            ["30", "30 jours"],
+            ["90", "90 jours"],
+            ["365", "12 mois"],
+            ["custom", "Personnalisée"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={preset === value ? "on" : ""}
+              aria-pressed={preset === value}
+              onClick={() => setQuickRange(value)}
+            >
+              {label}
+            </button>
+          ))}
+          </div>
+        </div>
+        <div className="dashboard-date-range">
+          <label>
+            Du
+            <input
+              aria-label="Date de début"
+              type="date"
+              value={fromInput}
+              onChange={event => {
+                setFromInput(event.target.value);
+                setPreset("custom");
+              }}
+            />
+          </label>
+          <label>
+            Au
+            <input
+              aria-label="Date de fin"
+              type="date"
+              value={toInput}
+              onChange={event => {
+                setToInput(event.target.value);
+                setPreset("custom");
+              }}
+            />
+          </label>
+          <button type="button" className="adm-btn adm-btn-dark" onClick={applyCustomRange}>
+            Appliquer
+          </button>
+        </div>
+        {rangeError && <p className="err" role="alert">{rangeError}</p>}
+        <label className="dashboard-chart-mode">
+          Type de graphique
+          <select
+            aria-label="Type de graphique"
+            value={chartMode}
+            onChange={event => setChartMode(event.target.value as ChartMode)}
+          >
+            <option value="bars">Barres</option>
+            <option value="line">Courbes</option>
+          </select>
+        </label>
+      </div>
+
       {errRev ? (
         <ErrorBox message={errRev} onRetry={reloadRev} />
       ) : !rev ? (
@@ -74,12 +313,12 @@ export default function Dashboard() {
           <section className="kpis">
             <Kpi
               icon="check"
-              label="Encaissé ce mois"
-              value={fcfa(rev.encaisse.ceMois)}
+              label="Encaissé sur la période"
+              value={fcfa(rev.encaisse.montantFcfa)}
               sub={
                 rev.encaisse.evolutionPct === null
-                  ? "pas de mois précédent à comparer"
-                  : `${rev.encaisse.evolutionPct >= 0 ? "+" : ""}${rev.encaisse.evolutionPct} % vs mois précédent`
+                  ? "pas de période précédente à comparer"
+                  : `${rev.encaisse.evolutionPct >= 0 ? "+" : ""}${rev.encaisse.evolutionPct} % vs période précédente`
               }
               tone={
                 rev.encaisse.evolutionPct !== null &&
@@ -90,9 +329,9 @@ export default function Dashboard() {
             />
             <Kpi
               icon="clock"
-              label="Mois précédent"
-              value={fcfa(rev.encaisse.moisPrecedent)}
-              sub="paiements enregistrés"
+              label="Période précédente"
+              value={fcfa(rev.encaisse.periodePrecedenteFcfa)}
+              sub="encaissements enregistrés"
             />
             <Kpi
               icon="zap"
@@ -105,28 +344,25 @@ export default function Dashboard() {
           <div className="grid2">
             <section className="panel">
               <div className="panel-h">
-                <h2>Encaissements par mois</h2>
-                <span className="adm-muted small">12 derniers mois</span>
+                <h2>Encaissements</h2>
+                <span className="adm-muted small">{from} — {to}</span>
               </div>
-              <Bars
-                data={rev.mois.map(m => ({
-                  label: moisCourt(m.mois),
-                  value: m.montantFcfa,
-                }))}
-                format={compact}
-              />
+              {chartMode === "bars" ? (
+                <Bars data={incomeData} format={compact} />
+              ) : (
+                <LineChart data={incomeData} format={compact} label="Encaissements par période" />
+              )}
             </section>
             <section className="panel">
               <div className="panel-h">
-                <h2>Nouvelles fiches par semaine</h2>
-                <span className="adm-muted small">12 dernières semaines</span>
+                <h2>Nouvelles fiches</h2>
+                <span className="adm-muted small">{from} — {to}</span>
               </div>
-              <Bars
-                data={rev.fichesParSemaine.map(w => ({
-                  label: jourMois(w.semaine),
-                  value: w.nb,
-                }))}
-              />
+              {chartMode === "bars" ? (
+                <Bars data={ficheData} />
+              ) : (
+                <LineChart data={ficheData} label="Nouvelles fiches par période" />
+              )}
             </section>
           </div>
         </>
@@ -192,6 +428,7 @@ export default function Dashboard() {
           onClick={go("/fiches?formule=signature")}
         />
       </section>
+      <RecentActivity stats={s} />
     </>
   );
 }

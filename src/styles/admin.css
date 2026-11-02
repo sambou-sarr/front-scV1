@@ -88,6 +88,25 @@
 .adm .kpi-l{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gris);font-weight:500}
 .adm .kpi b{font:600 30px/1.1 var(--sans);letter-spacing:-.02em;margin-top:4px}
 .adm .kpi small{font-size:12px;color:var(--gris)}
+.adm .dashboard-chart-controls{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:end;gap:16px;margin-bottom:14px;border-color:#d6d3ce}
+.adm .dashboard-range-control{display:grid;gap:6px;min-width:0}
+.adm .dashboard-range-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.adm .dashboard-range-heading strong{font-size:12px;color:var(--txt)}
+.adm .dashboard-control-group{display:flex;gap:4px;flex-wrap:wrap;background:#f1f0ed;padding:4px;border:1px solid #d6d3ce;border-radius:22px}
+.adm .dashboard-control-group button{border:1px solid transparent;background:transparent;border-radius:18px;padding:8px 13px;font-size:12px;font-weight:650;cursor:pointer;color:#333}
+.adm .dashboard-control-group button:hover{background:#e5e3df}
+.adm .dashboard-control-group button.on{background:var(--rouge);border-color:var(--rouge-d);color:#fff;box-shadow:0 2px 6px rgba(199,15,40,.28)}
+.adm .dashboard-control-group button.on::before{content:"✓ ";font-weight:800}
+.adm .dashboard-active-range{font-size:11px;font-weight:700;color:var(--rouge-d);white-space:nowrap}
+.adm .dashboard-date-range{display:flex;align-items:flex-end;gap:8px;flex-wrap:nowrap}
+.adm .dashboard-date-range label,.adm .dashboard-chart-mode{display:grid;gap:4px;font-size:11px;font-weight:600;color:var(--gris)}
+.adm .dashboard-date-range input{width:auto;padding:7px 9px;font-size:12px}
+.adm .dashboard-date-range .adm-btn{padding:8px 13px}
+.adm .dashboard-chart-mode select{width:auto;min-width:120px;padding:7px 10px;font-size:12px}
+@media (max-width:1100px){.adm .dashboard-chart-controls{grid-template-columns:minmax(0,1fr) auto}.adm .dashboard-range-control{grid-column:1/-1}.adm .dashboard-chart-mode{grid-column:2;grid-row:2}}
+@media (max-width:700px){.adm .dashboard-chart-controls{grid-template-columns:1fr;align-items:stretch}.adm .dashboard-range-control,.adm .dashboard-date-range,.adm .dashboard-chart-mode{grid-column:1;grid-row:auto}.adm .dashboard-range-heading{align-items:flex-start;flex-direction:column;gap:2px}.adm .dashboard-date-range{flex-wrap:wrap}.adm .dashboard-date-range label{flex:1;min-width:120px}.adm .dashboard-date-range input{width:100%}.adm .dashboard-chart-mode select{width:100%}}
+.adm .adm-line-chart{height:190px;min-width:0}
+.adm .adm-line-chart svg{width:100%;height:100%;overflow:visible}
 .adm .k-up small{color:var(--vert)}
 .adm .k-down small, .adm .k-down b{color:var(--rouge)}
 .adm .k-warn small{color:#a2560b}
@@ -236,6 +255,8 @@
 .adm .bar.last i{background:#08090a}
 .adm .bar-v{font-size:11px;font-weight:600;white-space:nowrap}
 .adm .bar-l{font-size:10.5px;color:var(--gris);white-space:nowrap}
+.adm .adm-line-chart{height:190px;min-width:0}
+.adm .adm-line-chart svg{width:100%;height:100%;overflow:visible}
 @media (max-width:860px){.adm .bars{gap:4px}.adm .bar-l{font-size:9px}}
 
 /* ---------- Production ---------- */

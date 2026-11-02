@@ -13,6 +13,7 @@ Interface d'administration, accessible sous `/admin`. Elle réutilise le socle d
 
 ## Routes
 `/admin/login`, `/admin`, `/admin/fiches`, `/admin/fiches/:id`, `/admin/abonnements`, `/admin/clients`, `/admin/relances`, `/admin/production`, `/admin/cartes`, `/admin/qrcodes`, `/admin/formules`, `/admin/historique`, `/admin/parametres`.
+Le tableau de bord filtre ses graphiques par période rapide ou plage de dates personnalisée, avec affichage en barres ou en courbe. Il présente aussi les dix derniers clients inscrits et les dix derniers abonnements (tous statuts).
 Les filtres de la liste de fiches se lisent dans l'URL : `?statut=…`, `?userId=…`.
 La page Abonnements & paiements regroupe les deux historiques avec filtres de recherche, formule, statut, période et état de la fiche (existante ou supprimée) ; elle relie chaque abonnement au paiement correspondant et inversement lorsque ces enregistrements sont associés. Les suppressions conservent le nom et le slug de la fiche dans les snapshots financiers pour identifier l’historique.
 La page `/admin/parametres` regroupe le profil et la sécurité de l’administrateur, la gestion de l’équipe (invitations, renvoi, désactivation/réactivation et suppression), les coordonnées publiques et le mode maintenance. Le profil utilise `/auth/me`; les réglages partagés sont enregistrés via `/admin/settings`. La facturation reste dans Formules et Abonnements & paiements. Le dernier administrateur actif et le compte connecté ne peuvent pas être supprimés/désactivés.

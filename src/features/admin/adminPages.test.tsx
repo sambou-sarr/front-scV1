@@ -59,17 +59,31 @@ const stats = {
   clients: 6,
   demandesSticker: 1,
   demandesCarte: 3,
+  derniersClients: [
+    { id: 21, nom: "Awa Ndiaye", email: "awa@example.sn", createdAt: "2026-11-02T10:00:00Z" },
+  ],
+  derniersAbonnements: [
+    {
+      id: 31,
+      formule: "pro",
+      statut: "active",
+      createdAt: "2026-11-02T11:00:00Z",
+      montantFcfa: 25000,
+      fiche: { id: 12, slug: "chez-awa", nom: "Awa Ndiaye", entreprise: "Chez Awa" },
+    },
+  ],
 };
 const revenus = {
-  encaisse: { ceMois: 50000, moisPrecedent: 40000, evolutionPct: 25 },
-  mois: [{ mois: "2026-09", montantFcfa: 50000, nbPaiements: 2 }],
+  encaisse: { montantFcfa: 50000, periodePrecedenteFcfa: 40000, evolutionPct: 25 },
+  grouping: "month",
+  encaissements: [{ periode: "2026-09-01", montantFcfa: 50000, nbPaiements: 2 }],
+  nouvellesFiches: [{ periode: "2026-09-01", nombre: 2 }],
   parFormule: {
     essentielle: { montantFcfa: 0, nbPaiements: 0 },
     pro: { montantFcfa: 0, nbPaiements: 0 },
     signature: { montantFcfa: 0, nbPaiements: 0 },
   },
   aRenouveler: { nb: 3, montantEstimeFcfa: 30000 },
-  fichesParSemaine: [{ semaine: "2026-09-21", nb: 2 }],
 };
 const page = { page: 1, limit: 20, total: 1, totalPages: 1 };
 const relance = (id: number, slug: string) => ({
@@ -449,8 +463,12 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Tableau de bord");
     expect(host.textContent).toContain("Back-office");
     expect(host.textContent).toContain("Root");
-    expect(host.textContent).toContain("Encaissé ce mois");
+    expect(host.textContent).toContain("Encaissé sur la période");
     expect(host.textContent).toMatch(/50\s000\sF/); // espace (insécable) du format fr-FR
+    expect(host.textContent).toContain("10 derniers clients inscrits");
+    expect(host.textContent).toContain("Awa Ndiaye");
+    expect(host.textContent).toContain("10 derniers abonnements");
+    expect(host.textContent).toContain("Encaissé sur la période");
     for (const l of [
       "Fiches",
       "Abonnements & paiements",
@@ -466,6 +484,51 @@ describe("pages du back-office", () => {
     expect(byText("aside nav a", "Formules")?.getAttribute("href")).toBe(
       "/admin/formules"
     );
+  });
+
+  it("filtre les graphiques par dates et permet de passer en courbe", async () => {
+    act(() => root.render(app("/admin")));
+    await settle();
+    expect(
+      calls.filter(call => call.url === "/admin/revenus").at(-1)?.params
+    ).toMatchObject({ from: expect.any(String), to: expect.any(String) });
+    const from = host.querySelector<HTMLInputElement>('input[aria-label="Date de début"]')!;
+    const to = host.querySelector<HTMLInputElement>('input[aria-label="Date de fin"]')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(from, "2026-10-01");
+      from.dispatchEvent(new Event("input", { bubbles: true }));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(to, "2026-10-31");
+      to.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    click(byText("button", "Appliquer"));
+    await settle();
+    expect(
+      calls.filter(call => call.url === "/admin/revenus").at(-1)?.params
+    ).toMatchObject({ from: "2026-10-01", to: "2026-10-31" });
+
+    const mode = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Type de graphique"]'
+    )!;
+    act(() => {
+      mode.value = "line";
+      mode.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(host.querySelectorAll(".adm-line-chart")).toHaveLength(2);
+  });
+
+  it("met clairement en évidence la période de 30 jours sélectionnée", async () => {
+    act(() => root.render(app("/admin")));
+    await settle();
+    const thirtyDays = byText('button[aria-pressed]', "30 jours");
+    expect(thirtyDays?.getAttribute("aria-pressed")).toBe("false");
+    click(thirtyDays);
+    await settle();
+
+    expect(thirtyDays?.getAttribute("aria-pressed")).toBe("true");
+    expect(host.textContent).toContain("Filtre actif : 30 jours");
+    expect(
+      calls.filter(call => call.url === "/admin/revenus").at(-1)?.params
+    ).toMatchObject({ from: expect.any(String), to: expect.any(String) });
   });
 
   it("affiche le journal d’activité et le logo dans l’en-tête mobile", async () => {

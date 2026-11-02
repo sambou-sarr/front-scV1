@@ -122,6 +122,16 @@ describe("adminApi", () => {
     });
   });
 
+  it("charge les indicateurs du dashboard avec la période sélectionnée", async () => {
+    await adminApi.getRevenus({ from: "2026-10-01", to: "2026-10-31" });
+
+    expect(calls[0]).toMatchObject({
+      method: "get",
+      url: "/admin/revenus",
+      params: { from: "2026-10-01", to: "2026-10-31" },
+    });
+  });
+
   it("charge les abonnements et paiements avec leurs filtres ciblés", async () => {
     await adminApi.listSubscriptions({
       formule: "signature",

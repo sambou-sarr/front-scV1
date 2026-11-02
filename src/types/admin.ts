@@ -53,6 +53,25 @@ export interface Stats {
   clients: number;
   demandesSticker: number;
   demandesCarte: number;
+  derniersClients: {
+    id: number;
+    nom: string | null;
+    email: string;
+    createdAt: string;
+  }[];
+  derniersAbonnements: {
+    id: number;
+    formule: Formule;
+    statut: AbonnementStatut;
+    createdAt: string;
+    montantFcfa: number | null;
+    fiche: {
+      id: number;
+      slug: string;
+      nom: string;
+      entreprise: string;
+    } | null;
+  }[];
 }
 
 export interface Abonnement {
@@ -212,14 +231,15 @@ export interface RelancesPage {
 
 export interface Revenus {
   encaisse: {
-    ceMois: number;
-    moisPrecedent: number;
+    montantFcfa: number;
+    periodePrecedenteFcfa: number;
     evolutionPct: number | null;
   };
-  mois: { mois: string; montantFcfa: number; nbPaiements: number }[];
+  grouping: "day" | "week" | "month";
+  encaissements: { periode: string; montantFcfa: number; nbPaiements: number }[];
+  nouvellesFiches: { periode: string; nombre: number }[];
   parFormule: Record<Formule, { montantFcfa: number; nbPaiements: number }>;
   aRenouveler: { nb: number; montantEstimeFcfa: number };
-  fichesParSemaine: { semaine: string; nb: number }[];
 }
 
 // ───── Production (cartes NFC, stickers, QR dynamiques) ─────

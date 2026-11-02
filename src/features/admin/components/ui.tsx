@@ -209,6 +209,82 @@ export function Bars({
   );
 }
 
+export function LineChart({
+  data,
+  format,
+  label,
+}: {
+  data: { label: string; value: number }[];
+  format?: (n: number) => string;
+  label: string;
+}) {
+  const max = Math.max(1, ...data.map(point => point.value));
+  const points = data.map((point, index) => {
+    const x = data.length <= 1 ? 300 : (index / (data.length - 1)) * 560 + 20;
+    const y = 180 - (point.value / max) * 150;
+    return { ...point, x, y };
+  });
+  const line = points.map(point => `${point.x},${point.y}`).join(" ");
+
+  return (
+    <div className="adm-line-chart">
+      <svg
+        viewBox="0 0 600 230"
+        role="img"
+        aria-label={label}
+        preserveAspectRatio="none"
+      >
+        {[30, 80, 130, 180].map(y => (
+          <line
+            key={y}
+            x1="20"
+            x2="580"
+            y1={y}
+            y2={y}
+            stroke="#e7e5e1"
+            strokeWidth="1"
+          />
+        ))}
+        {points.length > 1 && (
+          <polyline
+            points={line}
+            fill="none"
+            stroke="#ef1733"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+        {points.map(point => (
+          <g key={point.label}>
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill="#ef1733"
+              vectorEffect="non-scaling-stroke"
+            >
+              <title>
+                {point.label}: {format ? format(point.value) : point.value}
+              </title>
+            </circle>
+            <text
+              x={point.x}
+              y="215"
+              textAnchor="middle"
+              fill="#5c5f63"
+              fontSize="10"
+            >
+              {point.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 /** Onglets avec compteur. */
 export function Tabs<K extends string>({
   tabs,

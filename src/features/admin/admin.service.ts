@@ -126,7 +126,8 @@ async function postBlob(
 export const adminApi = {
   // ───── Tableau de bord ─────
   stats: () => get<Stats>("/admin/stats"),
-  getRevenus: () => get<Revenus>("/admin/revenus"),
+  getRevenus: (p: { from: string; to: string }) =>
+    get<Revenus>("/admin/revenus", p),
 
   // ───── Fiches ─────
   listFiches: (p: ListFichesParams) =>
