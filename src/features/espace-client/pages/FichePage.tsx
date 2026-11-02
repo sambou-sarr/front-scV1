@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { CardRequestPanel } from "../components/CardRequestPanel";
+import {
+  getCardRequest,
+  type CardModelPreview,
+} from "../espaceClient.service";
 import Fiche from "../components/Fiche";
 import PhonePreview from "../components/PhonePreview";
 import { fetchFiche } from "../lib/ficheApi";
@@ -417,7 +421,8 @@ function FicheDashboardPanel({
       ) : activeSection === "rappels" ? (
         <RappelsPanel ficheId={ficheId} />
       ) : (
-        <section className="">
+        <section className="fiche-card-request">
+          {eligible && <FicheCardModelPreview ficheId={ficheId} />}
           <div className="fiche-card-request-copy">
             <p className="fiche-card-request-eyebrow">Carte physique NFC</p>
             <h3>Votre fiche, toujours à portée de main.</h3>
@@ -476,6 +481,48 @@ function FicheDashboardPanel({
           )}
         </section>
       )}
+    </div>
+  );
+}
+
+function FicheCardModelPreview({ ficheId }: { ficheId: number }) {
+  const query = useQuery({
+    queryKey: ["card-request", ficheId],
+    queryFn: () => getCardRequest(ficheId),
+  });
+  const modele = query.data?.modele;
+
+  if (query.isPending) {
+    return <p className="fiche-card-model-status" role="status">Chargement de l’aperçu de la carte…</p>;
+  }
+  if (query.isError) {
+    return (
+      <div className="fiche-card-model-status" role="alert">
+        <p>Impossible de charger l’aperçu de la carte.</p>
+        <button type="button" onClick={() => void query.refetch()}>Réessayer</button>
+      </div>
+    );
+  }
+  if (!modele) {
+    return <p className="fiche-card-model-status">Aucun modèle de carte n’est configuré pour votre formule.</p>;
+  }
+  return <FicheCardFaces modele={modele} />;
+}
+
+function FicheCardFaces({ modele }: { modele: CardModelPreview }) {
+  return (
+    <div className="fiche-card-model-faces" aria-label={`Aperçu de la carte ${modele.nom}`}>
+      {([
+        ["Recto", modele.rectoUrl],
+        ["Verso", modele.versoUrl],
+      ] as const).map(([face, url]) => (
+        <figure key={face}>
+          <div className="fiche-card-model-image">
+            <img src={url} alt={`${modele.nom} — ${face.toLowerCase()}`} />
+          </div>
+          <figcaption>{face}</figcaption>
+        </figure>
+      ))}
     </div>
   );
 }

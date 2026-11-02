@@ -50,15 +50,18 @@ bloquée : `expiree: true`, `ABONNEMENT_EXPIRE`). Le renouvellement redonne une 
 
 ## Demande de carte : modèle défini par l'administration
 
-`CardRequestPanel` affiche la carte que l'administration a définie pour la formule (recto / verso, bascule entre les deux).
+`CardRequestPanel` affiche le modèle actif avant commande, puis le recto/verso conservé dans la commande pendant sa production.
 
 - Source : `getCardRequest(ficheId)` → `{ carte, modele }`. `modele` vient de `GET /fiches/:id/card-request` : c'est le
   modèle **actif** de la formule que le **serveur** facturera (abonnement valide, sinon Essentielle). Le libellé et le prix
-  affichés suivent donc `modele.tier` et non la formule de la fiche.
+  affichés suivent donc `modele.tier` avant commande, puis `carte.tier` pendant la production. La demande conserve les images
+  du modèle choisi ; les modifications ultérieures du modèle actif ne changent pas les commandes passées.
 - `modele: null` (aucun modèle défini, ou ancien serveur sans ce champ) : l'aperçu par défaut est conservé.
 - Une adresse d'image cassée affiche « Image indisponible » pour cette face, l'autre reste consultable.
+- Tant qu'une demande est en production, son statut est rechargé automatiquement toutes les 30 secondes.
 - Gestion des modèles : `/admin/cartes` (voir `admin/README.md`).
-- Non concerné : l'illustration décorative de l'onglet « Carte » de la fiche (`fiche-card-request-art`), qui reste statique.
+- Dans « Tableau de bord de la fiche » › « Carte », le recto et le verso du modèle actif sont affichés si l'abonnement de la
+  fiche est valide. Sans abonnement valide, l'aperçu n'est pas affiché.
 
 ## Outils du propriétaire (QR et « NFC · QR »)
 

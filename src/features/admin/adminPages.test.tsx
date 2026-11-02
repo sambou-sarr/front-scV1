@@ -55,6 +55,7 @@ const stats = {
   scansTotal: 1234,
   clients: 6,
   demandesSticker: 1,
+  demandesCarte: 3,
 };
 const revenus = {
   encaisse: { ceMois: 50000, moisPrecedent: 40000, evolutionPct: 25 },
@@ -99,6 +100,8 @@ const deletedBillingFiche = {
 };
 
 let calls: { url?: string; params?: Record<string, unknown> }[] = [];
+let productionCartes: Record<string, unknown>[] = [];
+let productionStickers: Record<string, unknown>[] = [];
 const original = api.defaults.adapter;
 const route = (c: InternalAxiosRequestConfig): unknown => {
   const url = c.url ?? "";
@@ -258,8 +261,31 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
       qrSansCible: 1,
       scansQr: 0,
     };
-  if (url === "/admin/production/cartes") return { cartes: [] };
-  if (url === "/admin/production/stickers") return { stickers: [] };
+  if (url === "/admin/production/cartes") return { cartes: productionCartes };
+  if (url === "/admin/production/modeles-cartes")
+    return {
+      modeles: [
+        {
+          id: 8,
+          tier: "pro",
+          nom: "Modèle Pro actif",
+          rectoUrl: "https://cdn.example/pro-recto.webp",
+          versoUrl: "https://cdn.example/pro-verso.webp",
+          actif: true,
+        },
+      ],
+    };
+  if (url === "/admin/production/modeles-cartes/images")
+    return {
+      url: "http://localhost:4000/api/media/cartes/0a1b2c3d-0000-4000-8000-000000000001.webp",
+    };
+  if (url === "/admin/production/cartes/55" && c.method === "patch") {
+    const body = JSON.parse(c.data as string) as Record<string, unknown>;
+    productionCartes = productionCartes.map(card => ({ ...card, ...body }));
+    return { carte: productionCartes[0] };
+  }
+  if (url === "/admin/production/stickers")
+    return { stickers: productionStickers };
   if (url === "/admin/production/qr")
     return {
       qr: [
@@ -295,6 +321,8 @@ let root: Root;
 beforeEach(() => {
   localStorage.clear();
   calls = [];
+  productionCartes = [];
+  productionStickers = [];
   saveSession({
     token: "T",
     user: { name: "Root", email: "root@sc.sn", role: "ADMIN" },
@@ -407,6 +435,7 @@ describe("pages du back-office", () => {
     ).toMatchObject({
       sticker: "demande",
     });
+
     expect(host.textContent).not.toContain("Menu");
     click(byText("button.adm-btn-red", "Voir sections"));
     await settle();
@@ -422,6 +451,20 @@ describe("pages du back-office", () => {
     click(byText('[role="dialog"] button', "Ouvrir la fiche"));
     await settle();
     expect(where()).toBe("/admin/fiches/12");
+  });
+
+  it("le KPI des demandes de cartes ouvre la page Production", async () => {
+    act(() => root.render(app("/admin")));
+    await settle();
+
+    expect(host.textContent).toContain("Demandes de cartes");
+    const cardKpi = byText("button.kpi", "Demandes de cartes");
+    expect(cardKpi?.textContent).toContain("3");
+    click(cardKpi);
+    await settle();
+
+    expect(where()).toBe("/admin/production");
+    expect(host.textContent).toContain("Production");
   });
 
   it("permet de filtrer les demandes de stickers depuis la page Fiches", async () => {
@@ -467,6 +510,142 @@ describe("pages du back-office", () => {
     act(() => root.render(app("/admin/fiches/13")));
     await settle();
     expect(host.textContent).not.toContain("Modifier l’adresse");
+  });
+
+  it("affiche les coordonnées, l'aperçu du modèle actif et filtre les cartes par statut sans upload", async () => {
+    productionCartes = [
+      {
+        id: 55,
+        ficheId: 12,
+        tier: "pro",
+        nfcUrl: "https://sc.example/f/chez-awa",
+        adresseChangee: false,
+        rectoUrl: null,
+        versoUrl: null,
+        design: null,
+        encodedAt: null,
+        statut: "a_imprimer",
+        notes: null,
+        printedAt: null,
+        testedAt: null,
+        createdAt: "2026-10-01T00:00:00.000Z",
+        adresseLivraison: "Dakar, Plateau",
+        telephoneLivraison: "770000000",
+        notesClient: "Appeler à l'arrivée",
+        montantFcfa: 12000,
+        fiche: {
+          id: 12,
+          slug: "chez-awa",
+          nom: "Awa Ndiaye",
+          entreprise: "Chez Awa",
+          telephone: "770000000",
+          email: "awa@example.sn",
+          fonction: "Gérante",
+        },
+      },
+      {
+        id: 56,
+        ficheId: 12,
+        tier: "pro",
+        nfcUrl: "https://sc.example/f/autre",
+        adresseChangee: false,
+        rectoUrl: null,
+        versoUrl: null,
+        design: null,
+        encodedAt: null,
+        statut: "livree",
+        notes: null,
+        printedAt: null,
+        testedAt: null,
+        createdAt: "2026-10-02T00:00:00.000Z",
+        adresseLivraison: null,
+        telephoneLivraison: null,
+        notesClient: null,
+        montantFcfa: null,
+        fiche: {
+          id: 13,
+          slug: "autre",
+          nom: "Autre client",
+          entreprise: "Autre client",
+          telephone: null,
+          email: null,
+          fonction: null,
+        },
+      },
+    ];
+    act(() => root.render(app("/admin/production")));
+    await settle();
+    expect(host.textContent).toContain("Livraison : Dakar, Plateau");
+    expect(host.textContent).toContain("Tél. livraison : 770000000");
+    expect(host.textContent).toContain("Appeler à l'arrivée");
+    expect(host.textContent).toContain("12 000 FCFA");
+    expect(host.querySelectorAll('input[type="file"]')).toHaveLength(0);
+    expect(host.textContent).toContain("Modèle Pro actif");
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+    const filter = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Filtrer les cartes par statut"]'
+    )!;
+    act(() => {
+      filter.value = "livree";
+      filter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(host.textContent).toContain("Autre client");
+
+    click(byText("button.adm-btn", "Aperçu"));
+    await settle();
+    expect(host.textContent).toContain("Recto · modèle actif Modèle Pro actif");
+    expect(host.querySelector('img[src="https://cdn.example/pro-recto.webp"]')).toBeTruthy();
+  });
+
+  it("filtre les stickers à fonction par statut de production", async () => {
+    const sticker = {
+      id: 1,
+      kind: "fonction",
+      fonction: "lien",
+      tailleMm: 30,
+      forme: "rond",
+      theme: "classique",
+      quantite: 1,
+      options: null,
+      parametres: { lien: "https://sc.example" },
+      personnalisation: null,
+      qrMode: "dynamique",
+      ficheSlug: "chez-awa",
+      ficheUrl: null,
+      qr: {
+        code: "qr-code-1",
+        url: "https://sc.example/q/qr-code-1",
+        targetUrl: "https://sc.example",
+        actif: true,
+        scans: 0,
+      },
+      statut: "parametre",
+      notes: null,
+      createdAt: "2026-10-01T00:00:00.000Z",
+      fiche: {
+        id: 12,
+        slug: "chez-awa",
+        nom: "Awa Ndiaye",
+        entreprise: "Chez Awa",
+      },
+    };
+    productionStickers = [sticker, { ...sticker, id: 2, statut: "a_parametrer" }];
+    act(() => root.render(app("/admin/production")));
+    await settle();
+    click(byText('button[role="tab"]', "Stickers à fonction"));
+    expect(host.querySelectorAll(".prod-card")).toHaveLength(2);
+    const filter = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Filtrer les stickers par statut"]'
+    )!;
+    act(() => {
+      filter.value = "parametre";
+      filter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+    expect(host.querySelectorAll(".prod-card")).toHaveLength(1);
+    expect(host.textContent).toContain("Paramétré");
   });
 
   it("un client ouvre la liste de ses fiches (?userId=)", async () => {

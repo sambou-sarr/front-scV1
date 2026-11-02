@@ -148,6 +148,13 @@ describe("stickers par section (administration)", () => {
     await act(async () => el.click());
     await settle();
   };
+  const choose = async (el: HTMLSelectElement, value: string) => {
+    await act(async () => {
+      el.value = value;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+  };
   const dialog = () =>
     document.body.querySelector<HTMLElement>('[role="dialog"]');
   const patches = () => calls.filter(c => c.method === "patch");
@@ -187,16 +194,27 @@ describe("stickers par section (administration)", () => {
 
     it("les filtres montrent les demandes activées, puis toutes", async () => {
       await mount(tab());
-      await click(btn(host, "Activées")!);
+      const filter = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Filtrer les demandes par statut"]',
+      )!;
+      await choose(filter, "active");
       expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
       expect(host.textContent).toContain("Activée");
-      await click(btn(host, "Toutes")!);
+      await choose(filter, "all");
       expect(host.querySelectorAll("tbody tr")).toHaveLength(4);
+      await choose(filter, "refusee");
+      expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+      expect(host.textContent).toContain("Refusée");
     });
 
     it("propose les bonnes décisions selon l'état de la demande", async () => {
       await mount(tab());
-      await click(btn(host, "Toutes")!);
+      await choose(
+        host.querySelector<HTMLSelectElement>(
+          'select[aria-label="Filtrer les demandes par statut"]',
+        )!,
+        "all",
+      );
       const labels = (i: number) =>
         [
           ...host.querySelectorAll("tbody tr")[i].querySelectorAll("button"),
@@ -228,7 +246,12 @@ describe("stickers par section (administration)", () => {
       await mount(tab());
       await click(btn(host, "Refuser")!);
       expect(patches()[0].body).toEqual({ statut: "refusee" });
-      await click(btn(host, "Toutes")!);
+      await choose(
+        host.querySelector<HTMLSelectElement>(
+          'select[aria-label="Filtrer les demandes par statut"]',
+        )!,
+        "all",
+      );
       await click(
         [
           ...host.querySelectorAll("tbody tr")[1].querySelectorAll("button"),

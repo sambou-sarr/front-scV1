@@ -52,6 +52,7 @@ export interface Stats {
   scansTotal: number;
   clients: number;
   demandesSticker: number;
+  demandesCarte: number;
 }
 
 export interface Abonnement {
@@ -262,6 +263,10 @@ export interface Carte {
   adresseChangee: boolean;
   rectoUrl: string | null;
   versoUrl: string | null;
+  adresseLivraison: string | null;
+  telephoneLivraison: string | null;
+  notesClient: string | null;
+  montantFcfa: number | null;
   design: Record<string, unknown> | null;
   encodedAt: string | null;
   statut: StatutCarte;

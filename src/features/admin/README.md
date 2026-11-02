@@ -35,13 +35,19 @@ lien https restent affichés et peuvent être remplacés par un fichier.
 - API : `adminApi.listModelesCartes / createModeleCarte / updateModeleCarte / deleteModeleCarte`
   (`/admin/production/modeles-cartes`) ; `uploadCardImage(file)` envoie le fichier en binaire (`/images`) et renvoie son adresse.
 - Côté client, `CardRequestPanel` lit `modele` dans `GET /fiches/:id/card-request` (voir `espace-client/README.md`).
+- Lors d'une demande client ou d'une création admin, les images du modèle actif sont copiées sur la commande : changer ou
+  supprimer un modèle ne modifie pas les commandes déjà créées. Dans **Production › Cartes**, l'atelier voit l'adresse,
+  le téléphone, les précisions et le montant à encaisser à la livraison. La colonne **Modèle actif** affiche le nom du
+  modèle actif de la formule et ouvre son aperçu recto-verso ; aucun fichier n'est téléversé ou modifié depuis Production.
+  Les cartes sont filtrables par statut. Les stickers à fonction et 30 mm le sont également.
 
 ## Stickers par section (demandes de devis)
 
 Le client demande un devis pour un nombre de stickers ouvrant une section de sa fiche ; l'administration **active la
 section** (c'est seulement alors qu'elle est servie au public et que le client reçoit lien et QR).
 
-- **Production › « Stickers par section »** : toutes les demandes (filtre « À traiter » par défaut) : fiche, section, nombre,
+- **Production › « Stickers par section »** : toutes les demandes (filtre « À traiter » par défaut, avec un filtre par
+  statut couvrant demande, activée, désactivée et refusée) : fiche, section, nombre,
   client, date, état. Actions : Aperçu, Activer la section, Refuser, Désactiver, Réactiver (mêmes transitions que le serveur :
   `demande → active | refusée`, `active → désactivée`, `désactivée → active`). L'onglet gère lui-même son chargement :
   une API pas à jour ne bloque pas le reste de la page.

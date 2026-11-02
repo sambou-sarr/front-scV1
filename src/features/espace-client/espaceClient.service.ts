@@ -41,7 +41,7 @@ export type FichePurchaseInput = {
 export type CardRequest = {
   id: number;
   ficheId: number | null;
-  tier: string;
+  tier: "essentielle" | "pro" | "signature";
   statut:
     | "a_imprimer"
     | "imprimee"
@@ -50,6 +50,8 @@ export type CardRequest = {
     | "livree"
     | "annulee";
   nfcUrl: string;
+  rectoUrl: string | null;
+  versoUrl: string | null;
   adresseLivraison: string | null;
   telephoneLivraison: string | null;
   notesClient: string | null;
