@@ -106,12 +106,7 @@ export default function Fiche({
     >
       <header
         className="f-hero"
-        style={
-          e.couverture &&
-          (e.disposition === "logo" || e.disposition === "banniere")
-            ? cssVars({ "--cover": `url(${e.couverture})` })
-            : undefined
-        }
+        style={e.couverture ? cssVars({ "--cover": `url(${e.couverture})` }) : undefined}
       >
         <div className="f-chips">
           <span>Fiche de contact</span>

@@ -1,14 +1,18 @@
-import type { FicheRecord } from "../../../../../types";
+import type { EnteteComplete, FicheRecord } from "../../../../../types";
 import { I } from "../../fiche/Icon";
 import { imageInput } from "../shared";
 
-/** Champs d'identité (nom, contacts…), photo de profil et logo. */
+/** Champs d'identité (nom, contacts…), photo de profil, logo et couverture. */
 export default function IdentityBox({
   fiche,
   up,
+  entete,
+  setE,
 }: {
   fiche: FicheRecord;
   up: (patch: Partial<FicheRecord>) => void;
+  entete: EnteteComplete;
+  setE: (patch: Partial<EnteteComplete>) => void;
 }) {
   const file = (cb: (url: string) => void) => imageInput(fiche.id, cb);
   return (
@@ -56,6 +60,19 @@ export default function IdentityBox({
           <span>Logo</span>
         </label>
       </div>
+      <label className="ed-file wide">
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={file(u => setE({ couverture: u }))}
+        />
+        {entete.couverture ? (
+          <img src={entete.couverture} alt="" />
+        ) : (
+          <I n="image" />
+        )}
+        <span>Photo de couverture de l'entête</span>
+      </label>
     </details>
   );
 }

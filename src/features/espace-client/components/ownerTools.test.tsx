@@ -49,6 +49,24 @@ describe("Fiche : outils du propriétaire", () => {
     expect(out).toContain("f-hero");
     for (const marker of OWNER_MARKERS) expect(out).not.toContain(marker);
   });
+
+  it("affiche la couverture derrière l'entête même avec la disposition portrait", () => {
+    const f = fiche();
+    f.formule = "essentielle";
+    f.data.entete = { couverture: "https://cdn.exemple.sn/cover.webp" };
+    const out = html(h(Fiche, { fiche: f }));
+
+    expect(out).toContain("--cover:url(https://cdn.exemple.sn/cover.webp)");
+  });
+
+  it("garde le thème comme fond par défaut lorsqu'aucune couverture n'est définie", () => {
+    const f = fiche();
+    f.data.entete = { ...f.data.entete, couverture: undefined };
+    const out = html(h(Fiche, { fiche: f }));
+
+    expect(out).toContain('class="f-hero"');
+    expect(out).not.toContain("--cover:");
+  });
 });
 
 describe("geste « tirer pour le QR »", () => {

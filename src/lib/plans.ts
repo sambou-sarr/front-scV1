@@ -383,6 +383,9 @@ export function resolveHeader(
     taille: "m",
     theme: plan.theme,
     ...(fiche.formule === "signature" ? signatureHeader(fiche) : {}),
+    ...(fiche.data.entete?.couverture
+      ? { couverture: fiche.data.entete.couverture }
+      : {}),
   };
   if (!plan.headerLayouts.includes(header.disposition))
     header.disposition = "portrait";

@@ -2,23 +2,19 @@ import { LAYOUTS, SIZES, THEMES } from "../../../../../lib/plans";
 import type {
   Disposition,
   EnteteComplete,
-  FicheRecord,
   Taille,
   Theme,
 } from "../../../../../types";
-import { I } from "../../fiche/Icon";
-import { Lock, imageInput } from "../shared";
+import { Lock } from "../shared";
 
 interface Props {
-  fiche: FicheRecord;
   sig: boolean;
   entete: EnteteComplete;
   setE: (patch: Partial<EnteteComplete>) => void;
 }
 
-/** Entête et apparence (disposition, taille, thème, couverture) : Signature uniquement. */
-export default function AppearanceBox({ fiche, sig, entete: e, setE }: Props) {
-  const file = (cb: (url: string) => void) => imageInput(fiche.id, cb);
+/** Disposition, taille et thème de l'entête : Signature uniquement. */
+export default function AppearanceBox({ sig, entete: e, setE }: Props) {
   return (
     <details className="ed-box">
       <summary>Entête et apparence</summary>
@@ -71,21 +67,6 @@ export default function AppearanceBox({ fiche, sig, entete: e, setE }: Props) {
               </div>
             </div>
           </div>
-          {(e.disposition === "logo" || e.disposition === "banniere") && (
-            <label className="ed-file wide">
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={file(u => setE({ couverture: u }))}
-              />
-              {e.couverture ? (
-                <img src={e.couverture} alt="" />
-              ) : (
-                <I n="image" />
-              )}
-              <span>Photo de couverture</span>
-            </label>
-          )}
         </>
       ) : (
         <Lock>

@@ -233,10 +233,31 @@ describe("resolveHeader", () => {
 
   it("Pro et Essentielle ignorent l'entête enregistré", () => {
     const pro = structuredClone(FICHES.find(f => f.slug === "mamadou-diop")!);
-    pro.data.entete = { disposition: "duo", taille: "l", theme: "nuit" };
+    pro.data.entete = {
+      disposition: "duo",
+      taille: "l",
+      theme: "nuit",
+      couverture: "https://cdn.exemple.sn/couverture.webp",
+    };
     expect(resolveHeader(pro)).toMatchObject({
       disposition: "portrait",
       taille: "m",
+      couverture: "https://cdn.exemple.sn/couverture.webp",
+    });
+  });
+
+  it("conserve la couverture des fiches Essentielle sans modifier leur thème", () => {
+    const essentielle = structuredClone(
+      FICHES.find(f => f.formule === "essentielle")!,
+    );
+    essentielle.data.entete = {
+      couverture: "https://cdn.exemple.sn/couverture.webp",
+    };
+
+    expect(resolveHeader(essentielle)).toMatchObject({
+      disposition: "portrait",
+      theme: "bleu",
+      couverture: "https://cdn.exemple.sn/couverture.webp",
     });
   });
 

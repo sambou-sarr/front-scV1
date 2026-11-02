@@ -37,6 +37,20 @@ describe("buildUpdatePayload", () => {
     expect(payload?.data).toEqual({ presentation: "Bonjour" });
   });
 
+  it("enregistre la couverture dans l'entête de la fiche", () => {
+    const f = base();
+    const { payload } = buildUpdatePayload(
+      f,
+      withData(f, {
+        entete: { couverture: "https://cdn.exemple.sn/couverture.webp" },
+      }),
+    );
+
+    expect(payload?.data).toEqual({
+      entete: { couverture: "https://cdn.exemple.sn/couverture.webp" },
+    });
+  });
+
   it("joint la version vue au chargement (détection de conflit)", () => {
     const f = { ...base(), updatedAt: "2026-01-01T00:00:00.000Z" };
     const { payload } = buildUpdatePayload(f, { ...f, nom: "Autre" });

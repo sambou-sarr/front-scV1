@@ -64,7 +64,7 @@ export default function Editor({
     });
   const entete: EnteteComplete = resolveHeader(fiche);
   const setE = (patch: Partial<EnteteComplete>) =>
-    upD({ entete: { ...entete, ...patch } });
+    upD({ entete: { ...resolveHeader(latest.current), ...patch } });
 
   return (
     <div className="ed">
@@ -82,8 +82,8 @@ export default function Editor({
         upD={upD}
       />
       <BlocksBox fiche={fiche} plan={plan} sig={sig} up={up} upD={upD} />
-      <IdentityBox fiche={fiche} up={up} />
-      <AppearanceBox fiche={fiche} sig={sig} entete={entete} setE={setE} />
+      <IdentityBox fiche={fiche} up={up} entete={entete} setE={setE} />
+      <AppearanceBox sig={sig} entete={entete} setE={setE} />
     </div>
   );
 }
