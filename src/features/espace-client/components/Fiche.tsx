@@ -185,7 +185,7 @@ export default function Fiche({
             <a
               key={a.k}
               href={a.href}
-              className={i === 0 ? "main" : ""}
+              className={i === 0 ? "primary" : ""}
               target={a.k === "whatsapp" ? "_blank" : undefined}
               rel="noreferrer"
             >

@@ -1,42 +1,14 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { adminApi } from '../admin.service';
-import { FORMULES } from '../lib/format';
 import { CHAMPS, FN } from '../lib/production';
 import { Btn, Field, Modal, Seg, useAction } from './ui';
 import FichePicker from './FichePicker';
-import type { CreateStickerInput, Fonction, FicheRow, Formule } from '../../../types/admin';
+import type { CreateStickerInput, Fonction, FicheRow } from '../../../types/admin';
 
 const FichePicked = ({ f, onClear }: { f: FicheRow; onClear: () => void }) => (
   <p className="picked-fiche"><b>{f.entreprise || f.nom}</b><span className="adm-muted">/{f.slug}</span><button type="button" className="link small" onClick={onClear}>changer</button></p>
 );
-
-// ───────── Nouvelle carte NFC ─────────
-export function NouvelleCarteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [fiche, setFiche] = useState<FicheRow | null>(null);
-  const [tier, setTier] = useState<'' | Formule>('');
-  const [busy, setBusy] = useState(false);
-  const run = useAction();
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!fiche) return;
-    setBusy(true);
-    const r = await run(() => adminApi.createCarte({ ficheId: fiche.id, tier: tier || undefined }), 'Carte ajoutée à la production');
-    setBusy(false);
-    if (r) { onCreated(); onClose(); }
-  };
-  return (
-    <Modal title="Nouvelle carte" onClose={onClose}>
-      <form className="form" onSubmit={submit}>
-        <div className="field"><span className="field-l">Fiche</span>{fiche ? <FichePicked f={fiche} onClear={() => setFiche(null)} /> : <FichePicker onPick={setFiche} />}</div>
-        <Field label="Formule de la carte" hint="Vide = formule en cours de la fiche"><select value={tier} onChange={(e) => setTier(e.target.value as '' | Formule)}>
-          <option value="">Automatique</option>{Object.entries(FORMULES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-        <p className="note-gold">L’adresse écrite dans la puce est figée à la création. Fixe l’adresse de la fiche avant d’encoder : si elle change ensuite, la carte devra être ré-encodée.</p>
-        <div className="form-a"><Btn onClick={onClose}>Annuler</Btn><button className="adm-btn adm-btn-red" type="submit" disabled={!fiche || busy}>Créer la carte</button></div>
-      </form>
-    </Modal>
-  );
-}
 
 // ───────── Nouveau sticker ─────────
 const TAILLES = [[80, '8 cm'], [120, '12 cm'], [170, '17 cm']] as const;

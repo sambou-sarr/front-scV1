@@ -51,9 +51,11 @@ function useDecision(onChanged: () => void) {
 export function FichePhone({
   ficheId,
   section,
+  whatsapp,
 }: {
   ficheId: number;
   section: string | null;
+  whatsapp?: string;
 }) {
   const [fiche, reload, err] = useData(
     () =>
@@ -65,19 +67,25 @@ export function FichePhone({
   );
   if (err) return <ErrorBox message={err} onRetry={reload} />;
   if (!fiche) return <Loading />;
+  const previewFiche =
+    whatsapp && !fiche.whatsapp ? { ...fiche, whatsapp } : fiche;
   return (
     <PhonePreview>
       {scroller =>
         section ? (
           <StickerSectionView
-            key={`${fiche.id}-${section}`}
-            fiche={fiche}
+            key={`${previewFiche.id}-${section}`}
+            fiche={previewFiche}
             section={section}
             scrollerRef={scroller}
             preview
           />
         ) : (
-          <Fiche key={fiche.id} fiche={fiche} scrollerRef={scroller} />
+          <Fiche
+            key={previewFiche.id}
+            fiche={previewFiche}
+            scrollerRef={scroller}
+          />
         )
       }
     </PhonePreview>
@@ -223,7 +231,13 @@ export function SectionStickersTab({
 }
 
 /** Panneau de la fiche détail (/admin/fiches/:id) : mini téléphone + demandes de stickers de CETTE fiche. */
-export function FichePreviewPanel({ ficheId }: { ficheId: number }) {
+export function FichePreviewPanel({
+  ficheId,
+  whatsapp,
+}: {
+  ficheId: number;
+  whatsapp?: string;
+}) {
   const [data, reload, err] = useData(
     () => adminApi.listSectionStickers({ ficheId }),
     [ficheId]
@@ -292,7 +306,7 @@ export function FichePreviewPanel({ ficheId }: { ficheId: number }) {
             </p>
           )}
         </div>
-        <FichePhone ficheId={ficheId} section={section} />
+        <FichePhone ficheId={ficheId} section={section} whatsapp={whatsapp} />
       </div>
     </section>
   );

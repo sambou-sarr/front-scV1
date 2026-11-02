@@ -115,6 +115,7 @@ describe("stickers par section (administration)", () => {
           fiche: {
             ...fixture,
             id: 12,
+            whatsapp: "",
             formule: fixture.formule.toUpperCase(),
             statut: fixture.statut.toUpperCase(),
             stickerSections: [],
@@ -310,7 +311,8 @@ describe("stickers par section (administration)", () => {
   });
 
   describe("fiche détail (/admin/fiches/:id) : mini téléphone et demandes de la fiche", () => {
-    const panel = () => h(FichePreviewPanel, { ficheId: 12 });
+    const panel = () =>
+      h(FichePreviewPanel, { ficheId: 12, whatsapp: fixture.whatsapp });
     beforeEach(() => {
       store = [
         demande({ id: 1, statut: "demande" }),
@@ -339,6 +341,10 @@ describe("stickers par section (administration)", () => {
       expect(host.textContent).not.toContain("/autre");
       expect(host.querySelector(".fiche-preview-device")).toBeTruthy();
       expect(host.querySelector(".f-hero")).toBeTruthy(); // fiche complète par défaut
+      expect(
+        [...host.querySelectorAll(".f-acts a")].map(link => link.textContent),
+      ).toEqual(["WhatsApp", "Appeler", "E-mail"]);
+      expect(host.querySelector(".f-acts a.primary")?.textContent).toBe("WhatsApp");
     });
 
     it("« Aperçu » montre la section dans le téléphone, puis on revient à la fiche", async () => {

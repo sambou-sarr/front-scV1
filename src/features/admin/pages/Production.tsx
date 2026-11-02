@@ -4,7 +4,7 @@ import { adminApi } from '../admin.service';
 import { SectionStickersTab } from '../components/SectionStickers';
 import { Badge, Btn, Empty, ErrorBox, Icon, Kpi, Loading, Modal, Tabs, useAction, useToast } from '../components/ui';
 import { useData } from '../hooks/useData';
-import { NouvelleCarteModal, NouveauStickerModal } from '../components/ProductionModals';
+import { NouveauStickerModal } from '../components/ProductionModals';
 import { FORMULE_TONE, ago, fdate } from '../lib/format';
 import { CARD, download, phoneStickerSVG, stickerSVG, svgDataUrl, svgToPng } from '../lib/print';
 import { qrPayload } from '../../../lib/qr';
@@ -20,7 +20,7 @@ import { carteStatusOptions, FN, LBL, PS, SS, TITLE, TONE, VAL } from '../lib/pr
   L'aperçu des cartes utilise le modèle actif configuré pour leur formule.
 */
 type Vue = { type: 'carte'; c: Carte; modele: ModeleCarte | null } | { type: 'sticker'; x: Sticker };
-type Creation = null | 'carte' | 'sticker';
+type Creation = null | 'sticker';
 type CardStatusFilter = StatutCarte | 'tous';
 type StickerStatusFilter = StatutSticker | 'tous';
 
@@ -94,7 +94,7 @@ export default function Production() {
     <>
       <header className="ph row">
         <div><p className="eyebrow">Atelier</p><h1>Production</h1><p className="lede">Les commandes de cartes affichent l’aperçu du modèle actif par formule et l’adresse à encoder dans la puce. Les stickers arrivent classés par fonction, avec tout ce qu’il faut pour les paramétrer.</p></div>
-        <div className="ph-actions"><Btn icon="plus" onClick={() => setCreation('sticker')}>Nouveau sticker</Btn><Btn kind="red" icon="plus" onClick={() => setCreation('carte')}>Nouvelle carte</Btn></div>
+        <div className="ph-actions"><Btn icon="plus" onClick={() => setCreation('sticker')}>Nouveau sticker</Btn></div>
       </header>
 
       <section className="kpis">
@@ -135,7 +135,7 @@ export default function Production() {
               {carteStatusOptions(c.statut).slice(1).map((statut) => <option key={statut} value={statut}>{PS[statut]}</option>)}
             </select></td>
           </tr>))}
-        </tbody></table></div> : <Empty>{cartes.cartes.length ? 'Aucune carte pour ce statut.' : 'Aucune carte à produire. Crée-en une avec « Nouvelle carte ».'}</Empty>}
+        </tbody></table></div> : <Empty>{cartes.cartes.length ? 'Aucune carte pour ce statut.' : 'Aucune demande de carte à produire.'}</Empty>}
           </>}
 
           {tab === 'fonction' && <>
@@ -189,7 +189,6 @@ export default function Production() {
           onSave={(b, msg) => run(() => adminApi.updateQr(q.code, b), msg).then((r) => r && refresh())} />)}</tbody></table></div> : <Empty>Aucun QR dynamique.</Empty>)}
 
       {vue && <Apercu vue={vue} onClose={() => setVue(null)} />}
-      {creation === 'carte' && <NouvelleCarteModal onClose={() => setCreation(null)} onCreated={refresh} />}
       {creation === 'sticker' && <NouveauStickerModal onClose={() => setCreation(null)} onCreated={refresh} />}
     </>
   );

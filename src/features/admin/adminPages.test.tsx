@@ -575,6 +575,8 @@ describe("pages du back-office", () => {
     ];
     act(() => root.render(app("/admin/production")));
     await settle();
+    expect(host.textContent).not.toContain("Nouvelle carte");
+    expect(host.textContent).toContain("Nouveau sticker");
     expect(host.textContent).toContain("Livraison : Dakar, Plateau");
     expect(host.textContent).toContain("Tél. livraison : 770000000");
     expect(host.textContent).toContain("Appeler à l'arrivée");

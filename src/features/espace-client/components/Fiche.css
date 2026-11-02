@@ -331,11 +331,13 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .f-acts a {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
   gap: 4px;
@@ -353,7 +355,7 @@
 .f-acts a:active {
   transform: scale(0.97);
 }
-.f-acts a.main {
+.f-acts a.primary {
   background: var(--btn);
   color: var(--btn-tx);
   border-color: transparent;

@@ -35,7 +35,7 @@ lien https restent affichés et peuvent être remplacés par un fichier.
 - API : `adminApi.listModelesCartes / createModeleCarte / updateModeleCarte / deleteModeleCarte`
   (`/admin/production/modeles-cartes`) ; `uploadCardImage(file)` envoie le fichier en binaire (`/images`) et renvoie son adresse.
 - Côté client, `CardRequestPanel` lit `modele` dans `GET /fiches/:id/card-request` (voir `espace-client/README.md`).
-- Lors d'une demande client ou d'une création admin, les images du modèle actif sont copiées sur la commande : changer ou
+- Lors d'une demande client, les images du modèle actif sont copiées sur la commande : changer ou
   supprimer un modèle ne modifie pas les commandes déjà créées. Dans **Production › Cartes**, l'atelier voit l'adresse,
   le téléphone, les précisions et le montant à encaisser à la livraison. La colonne **Modèle actif** affiche le nom du
   modèle actif de la formule et ouvre son aperçu recto-verso ; aucun fichier n'est téléversé ou modifié depuis Production.

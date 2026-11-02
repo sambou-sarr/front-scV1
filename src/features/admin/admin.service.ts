@@ -14,7 +14,6 @@ import type {
   Emplacements,
   FicheDetail,
   FichesPage,
-  Formule,
   FormuleReglage,
   LeadRequest,
   LeadRequestsPage,
@@ -192,12 +191,6 @@ export const adminApi = {
   // ───── Production (cartes NFC, stickers, QR dynamiques) ─────
   productionSummary: () => get<ProductionSummary>("/admin/production/summary"),
   listCartes: () => get<{ cartes: Carte[] }>("/admin/production/cartes"),
-  createCarte: (b: {
-    ficheId: number;
-    tier?: Formule;
-    rectoUrl?: string;
-    versoUrl?: string;
-  }) => post<{ carte: Carte }>("/admin/production/cartes", b),
   updateCarte: (
     id: number,
     b: {

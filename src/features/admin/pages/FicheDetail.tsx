@@ -164,7 +164,7 @@ function FicheDetail({ id }: { id: number }) {
         )}
       </section>
 
-      <FichePreviewPanel ficheId={id} />
+      <FichePreviewPanel ficheId={id} whatsapp={str(fiche.whatsapp)} />
 
       <section className="panel">
         <div className="panel-h">
