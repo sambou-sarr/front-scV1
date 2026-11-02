@@ -15,6 +15,8 @@
   déconnexion locale est programmée à l'échéance. Le serveur reste seul juge de la validité.
 - Les erreurs : `lib/apiError.ts` (`ApiError`, `toApiError`, `isAuthFailure`). Les services d'authentification lèvent des
   `ApiError` ; le reste du code continue de recevoir l'`AxiosError` d'origine (utilisée par `toFicheError`…).
+  Les réponses HTTP 5xx et erreurs réseau sont normalisées par le client HTTP : les détails techniques ne sont pas
+  transmis aux écrans, qui affichent un message générique et actionnable.
 
 ## Limite connue : un jeton dans localStorage est lisible par tout script de la page
 

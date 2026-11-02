@@ -73,6 +73,42 @@ describe("client HTTP", () => {
     expect(getSession()).not.toBeNull();
   });
 
+  it("remplace les détails techniques des erreurs serveur par un message sûr", async () => {
+    respond = () => ({
+      status: 500,
+      data: {
+        error: {
+          code: "DB_ERROR",
+          message: "postgres://internal-host/password",
+        },
+      },
+    });
+
+    await expect(api.get("/x")).rejects.toMatchObject({
+      message: "Une erreur technique est survenue. Réessayez plus tard.",
+      response: {
+        status: 500,
+        data: {
+          error: {
+            code: "ERREUR_SERVEUR",
+            message: "Une erreur technique est survenue. Réessayez plus tard.",
+          },
+        },
+      },
+    });
+  });
+
+  it("normalise les erreurs réseau sans réponse serveur", async () => {
+    api.defaults.adapter = async () => {
+      throw new AxiosError("ECONNREFUSED postgres://internal-host");
+    };
+
+    await expect(api.get("/x")).rejects.toMatchObject({
+      message:
+        "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    });
+  });
+
   it("un 401 de connexion (mauvais mot de passe) ne touche pas la session", async () => {
     saveSession({ token: "T1", user });
     respond = () => ({

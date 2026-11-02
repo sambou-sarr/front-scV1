@@ -377,6 +377,8 @@ describe("Modèles de cartes (admin)", () => {
   it("une erreur du serveur est affichée", async () => {
     failList = true;
     await open();
-    expect(host.textContent).toContain("Serveur indisponible");
+    expect(host.textContent).toContain(
+      "Une erreur technique est survenue. Réessayez plus tard.",
+    );
   });
 });

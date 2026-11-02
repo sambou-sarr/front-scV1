@@ -216,7 +216,7 @@ describe("adminApi", () => {
 
     respond = () => ({ status: 503, data: {} });
     await expect(adminApi.stats()).rejects.toMatchObject({
-      message: "Erreur du serveur.",
+      message: "Une erreur technique est survenue. Réessayez plus tard.",
     });
   });
 

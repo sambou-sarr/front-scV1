@@ -3,6 +3,7 @@ import { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../../lib/apiError";
 import { forgotPassword } from "../../auth/auth.service";
 import SettingsPage from "./SettingsPage";
 
@@ -59,7 +60,11 @@ describe("Paramètres client : réinitialisation du mot de passe", () => {
 
   it("affiche une erreur explicite si l’envoi échoue", async () => {
     vi.mocked(forgotPassword).mockRejectedValue(
-      new Error("Vérifiez votre connexion et réessayez."),
+      new ApiError(
+        "Vérifiez votre connexion et réessayez.",
+        "NETWORK",
+        0,
+      ),
     );
 
     await act(async () => {

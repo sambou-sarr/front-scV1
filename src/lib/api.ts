@@ -1,5 +1,9 @@
 import axios, { isAxiosError, InternalAxiosRequestConfig } from "axios";
 import { clearSession, getToken } from "./session";
+import {
+  NETWORK_ERROR_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+} from "./apiError";
 
 // VITE_API_URL doit contenir la base de l’API, y compris /api (ex. https://api.example.com/api).
 
@@ -23,9 +27,9 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 /*
-  Jeton refusé par le serveur (401) : la session locale est supprimée. Le garde <RequireAuth> réagit au
-  changement et renvoie vers /login ; les appelants gardent l'AxiosError d'origine (le format serveur
-  { error: { code, message } } reste lisible par toFicheError, uploadErrorMessage…).
+  Jeton refusé par le serveur (401) : la session locale est supprimée. Les 5xx et erreurs réseau
+  gardent leur AxiosError pour le statut et les traitements métier, mais leur message et leur corps
+  sont remplacés par des informations sûres avant d'atteindre les écrans.
 */
 api.interceptors.response.use(undefined, (error: unknown) => {
   if (
@@ -34,6 +38,19 @@ api.interceptors.response.use(undefined, (error: unknown) => {
     error.config?.headers?.Authorization
   ) {
     clearSession();
+  }
+  if (isAxiosError(error)) {
+    if (error.response && error.response.status >= 500) {
+      error.message = SERVER_ERROR_MESSAGE;
+      error.response.data = {
+        error: {
+          code: "ERREUR_SERVEUR",
+          message: SERVER_ERROR_MESSAGE,
+        },
+      };
+    } else if (!error.response) {
+      error.message = NETWORK_ERROR_MESSAGE;
+    }
   }
   return Promise.reject(error);
 });

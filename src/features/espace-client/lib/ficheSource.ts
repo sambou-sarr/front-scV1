@@ -161,6 +161,13 @@ export function toFicheError(e: unknown): FicheError {
     return new FicheError("Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.", "network");
 
   const { status, data } = e.response;
+  if (status >= 500) {
+    return new FicheError(
+      "Une erreur technique est survenue. Réessayez plus tard.",
+      "server",
+      "ERREUR_SERVEUR",
+    );
+  }
   const err = (data as { error?: { code?: string; message?: string; details?: { champ: string; message: string }[] } })?.error;
   const issues: FieldIssue[] = (Array.isArray(err?.details) ? err!.details! : []).map(d => ({
     champ: d.champ,

@@ -1,5 +1,11 @@
 import { isAxiosError } from "axios";
 
+export const SERVER_ERROR_MESSAGE =
+  "Une erreur technique est survenue. Réessayez plus tard.";
+export const NETWORK_ERROR_MESSAGE =
+  "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.";
+const UNEXPECTED_ERROR_MESSAGE = "Une erreur inattendue est survenue.";
+
 /** Erreur d'API normalisée (message lisible, code métier du serveur, statut HTTP). */
 export class ApiError extends Error {
   constructor(
@@ -39,15 +45,22 @@ export const isAuthFailure = (e: unknown) => {
  */
 export function toApiError(
   e: unknown,
-  fallback = "Une erreur est survenue.",
+  fallback?: string,
 ): ApiError {
   if (e instanceof ApiError) return e;
   if (isAxiosError(e)) {
     if (!e.response) {
       return new ApiError(
-        "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+        NETWORK_ERROR_MESSAGE,
         "NETWORK",
         0,
+      );
+    }
+    if (e.response.status >= 500) {
+      return new ApiError(
+        fallback ?? SERVER_ERROR_MESSAGE,
+        "ERREUR_SERVEUR",
+        e.response.status,
       );
     }
     const body = e.response.data as ErrorBody | undefined;
@@ -56,14 +69,18 @@ export function toApiError(
       err?.message ??
         (typeof body?.error === "string" ? body.error : undefined) ??
         body?.message ??
-        fallback,
+        fallback ??
+        "Une erreur est survenue.",
       err?.code,
       e.response.status,
     );
   }
-  return new ApiError(e instanceof Error ? e.message : fallback);
+  return new ApiError(fallback ?? UNEXPECTED_ERROR_MESSAGE);
 }
 
 /** Message lisible d'une erreur quelconque (notifications, états d'erreur des écrans). */
-export const errMsg = (e: unknown): string =>
-  e instanceof Error ? e.message : "Erreur inconnue";
+export const errMsg = (e: unknown): string => {
+  if (e instanceof ApiError) return e.message;
+  if (isAxiosError(e)) return toApiError(e).message;
+  return UNEXPECTED_ERROR_MESSAGE;
+};

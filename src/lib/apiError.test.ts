@@ -2,6 +2,7 @@ import { AxiosError } from "axios";
 import { describe, expect, it } from "vitest";
 import {
   ApiError,
+  errMsg,
   isAuthFailure,
   isUnauthorized,
   toApiError,
@@ -39,8 +40,45 @@ describe("toApiError", () => {
     );
   });
 
-  it("utilise le message de repli quand le corps est vide", () => {
-    expect(toApiError(axiosErr(500, {}), "Oups").message).toBe("Oups");
+  it("utilise le fallback explicite sûr quand le corps d'une erreur serveur est vide", () => {
+    expect(toApiError(axiosErr(500, {}), "Oups").message).toBe(
+      "Oups",
+    );
+    expect(toApiError(axiosErr(500, {})).message).toBe(
+      "Une erreur technique est survenue. Réessayez plus tard.",
+    );
+  });
+
+  it("n'expose jamais le message technique renvoyé avec une erreur serveur", () => {
+    const e = toApiError(
+      axiosErr(503, {
+        error: {
+          code: "DB_UNAVAILABLE",
+          message: "postgres://internal-host/password",
+        },
+      }),
+    );
+
+    expect(e.message).toBe(
+      "Une erreur technique est survenue. Réessayez plus tard.",
+    );
+    expect(e.code).toBe("ERREUR_SERVEUR");
+    expect(e.status).toBe(503);
+  });
+
+  it("n'expose pas le message d'une erreur technique locale inconnue", () => {
+    expect(toApiError(new Error("internal stack details")).message).toBe(
+      "Une erreur inattendue est survenue.",
+    );
+  });
+
+  it("normalise les erreurs utilisées directement par les écrans", () => {
+    expect(errMsg(axiosErr(500, { message: "database password" }))).toBe(
+      "Une erreur technique est survenue. Réessayez plus tard.",
+    );
+    expect(errMsg(new Error("internal stack details"))).toBe(
+      "Une erreur inattendue est survenue.",
+    );
   });
 
   it("signale l'absence de réseau", () => {

@@ -391,7 +391,7 @@ describe("stickers par section (administration)", () => {
     it("fiche illisible : erreur dans la zone du téléphone, la liste des demandes reste utilisable", async () => {
       failFiche = true;
       await mount(panel());
-      expect(host.textContent).toContain("Fiche indisponible");
+      expect(host.textContent).toContain("Fiche indisponible. Réessayez.");
       expect(host.querySelector(".fiche-preview-device")).toBeNull();
       expect(btn(host, "Activer la section")).toBeTruthy();
     });
@@ -399,7 +399,9 @@ describe("stickers par section (administration)", () => {
     it("liste des demandes illisible : erreur, mais le mini téléphone s'affiche quand même", async () => {
       failList = true;
       await mount(panel());
-      expect(host.textContent).toContain("Liste indisponible");
+      expect(host.textContent).toContain(
+        "Impossible de charger les demandes de stickers. Réessayez.",
+      );
       expect(host.querySelector(".f-hero")).toBeTruthy();
     });
   });

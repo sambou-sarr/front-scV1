@@ -1,7 +1,7 @@
 import type { AxiosResponse } from "axios";
 import { isAxiosError } from "axios";
 import { api } from "../../lib/api";
-import { toApiError } from "../../lib/apiError";
+import { SERVER_ERROR_MESSAGE, toApiError } from "../../lib/apiError";
 import type {
   Abonnement,
   AdminAbonnement,
@@ -65,9 +65,10 @@ const FALLBACK: Record<number, string> = {
 const fallbackFor = (e: unknown): string => {
   const status = isAxiosError(e) ? e.response?.status : undefined;
   if (!status) return "Une erreur est survenue.";
+  if (status >= 500) return SERVER_ERROR_MESSAGE;
   return (
     FALLBACK[status] ??
-    (status >= 500 ? "Erreur du serveur." : `Erreur ${status}.`)
+    `Erreur ${status}.`
   );
 };
 
@@ -81,11 +82,14 @@ const clean = (q: Query = {}): Record<string, string | number | boolean> =>
     )
   ) as Record<string, string | number | boolean>;
 
-async function call<T>(promise: Promise<AxiosResponse<T>>): Promise<T> {
+async function call<T>(
+  promise: Promise<AxiosResponse<T>>,
+  fallback?: string,
+): Promise<T> {
   try {
     return (await promise).data;
   } catch (e) {
-    throw toApiError(e, fallbackFor(e));
+    throw toApiError(e, fallback ?? fallbackFor(e));
   }
 }
 
@@ -204,11 +208,13 @@ export const adminApi = {
   // Stickers « par section » : demandes de devis des clients ; activer une demande ouvre la section en page publique
   listSectionStickers: (
     q: { statut?: SectionStickerAdmin["statut"]; ficheId?: number } = {}
-  ) =>
-    get<{ demandes: SectionStickerAdmin[] }>(
+  ) => call(
+    api.get<{ demandes: SectionStickerAdmin[] }>(
       "/admin/production/section-stickers",
-      q
+      { params: clean(q) },
     ),
+    "Impossible de charger les demandes de stickers. Réessayez.",
+  ),
   setSectionStickerStatus: (
     id: number,
     statut: "active" | "desactivee" | "refusee"

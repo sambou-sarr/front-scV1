@@ -9,6 +9,7 @@ import {
   publishFiche,
   toFicheRecord,
 } from "./ficheApi";
+import { toFicheError } from "./ficheSource";
 
 const dto = (over: Partial<ApiFicheDetail> = {}): ApiFicheDetail => ({
   id: 7,
@@ -88,6 +89,35 @@ describe("toFicheRecord", () => {
 describe("FICHE_DATA_KEYS", () => {
   it("ne contient aucun doublon", () => {
     expect(new Set(FICHE_DATA_KEYS).size).toBe(FICHE_DATA_KEYS.length);
+  });
+});
+
+describe("toFicheError", () => {
+  it("masque les détails techniques d'une erreur 5xx", () => {
+    const error = new AxiosError(
+      "database password",
+      "500",
+      undefined,
+      undefined,
+      {
+        status: 500,
+        data: {
+          error: {
+            code: "DB_ERROR",
+            message: "postgres://internal-host/password",
+          },
+        },
+        statusText: "",
+        headers: {},
+        config: {},
+      } as never,
+    );
+
+    expect(toFicheError(error)).toMatchObject({
+      message: "Une erreur technique est survenue. Réessayez plus tard.",
+      code: "ERREUR_SERVEUR",
+      kind: "server",
+    });
   });
 });
 

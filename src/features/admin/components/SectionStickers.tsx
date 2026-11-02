@@ -59,9 +59,9 @@ export function FichePhone({
 }) {
   const [fiche, reload, err] = useData(
     () =>
-      // message du serveur plutôt que celui de la bibliothèque HTTP
+      // message lisible du service plutôt qu'une erreur technique brute
       fetchFiche(`fiches/${ficheId}`).catch(e => {
-        throw toApiError(e);
+        throw toApiError(e, "Fiche indisponible. Réessayez.");
       }),
     [ficheId]
   );
