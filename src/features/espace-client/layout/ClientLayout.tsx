@@ -1,8 +1,13 @@
 import { Suspense, type ReactNode } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useSession } from "../../../lib/session";
 import "../../../styles/layout.css";
-import { logout as signOut } from "../../auth/auth.service";
+import {
+  getCurrentUser,
+  logout as signOut,
+  resendVerificationEmail,
+} from "../../auth/auth.service";
 
 /*
   Cadre de l'espace client : menu latéral (Tableau de bord, Paramètres) + zone de contenu (<Outlet />).
@@ -104,12 +109,23 @@ const MOBILE_LABEL: Record<string, string> = {
 export default function ClientLayout({ children }: { children?: ReactNode }) {
   const { pathname } = useLocation();
   const user = useSession()?.user;
+  const profile = useQuery({
+    queryKey: ["auth", "me", user?.id],
+    queryFn: getCurrentUser,
+    enabled: Boolean(user),
+    refetchOnWindowFocus: "always",
+  });
+  const verificationEmail = useMutation({
+    mutationFn: resendVerificationEmail,
+  });
 
   // Prévient le serveur puis supprime la session ; <RequireAuth> renvoie alors vers /login.
   const logout = () => void signOut();
 
   // La protection de la route est assurée par <RequireAuth> (App.tsx) ; ceci rassure seulement TypeScript.
   if (!user) return null;
+
+  const emailVerified = profile.data?.emailVerified ?? user.emailVerified;
 
   return (
     <div className="cl">
@@ -178,6 +194,63 @@ export default function ClientLayout({ children }: { children?: ReactNode }) {
       </aside>
 
       <main id="cl-main" className="cl-main" tabIndex={-1}>
+        {emailVerified === false && (
+          <section
+            className="mx-auto my-5 flex max-w-5xl flex-col gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-4 text-red-950 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+            role="alert"
+            aria-labelledby="cl-email-verification-title"
+          >
+            <div>
+              <h2
+                id="cl-email-verification-title"
+                className="font-semibold"
+              >
+                Votre adresse e-mail n’est pas vérifiée
+              </h2>
+              <p className="mt-1 text-sm">
+                Vérifiez votre boîte de réception à l’adresse {user.email} et
+                confirmez votre compte.
+              </p>
+              {verificationEmail.isSuccess && (
+                <p className="mt-2 text-sm font-medium text-green-800" role="status">
+                  Le lien de vérification a été envoyé à {user.email}.
+                </p>
+              )}
+              {verificationEmail.isError && (
+                <p className="mt-2 text-sm text-red-800" role="alert">
+                  {verificationEmail.error.message}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-wait disabled:opacity-60"
+              onClick={() => verificationEmail.mutate()}
+              disabled={verificationEmail.isPending}
+            >
+              {verificationEmail.isPending
+                ? "Envoi en cours…"
+                : verificationEmail.isSuccess
+                  ? "Renvoyer le lien"
+                  : "Vérifier mon e-mail"}
+            </button>
+          </section>
+        )}
+        {emailVerified === undefined && profile.isError && (
+          <div
+            className="mx-auto my-5 flex max-w-5xl items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+            role="alert"
+          >
+            <span>Impossible de vérifier l’état de votre adresse e-mail.</span>
+            <button
+              type="button"
+              className="shrink-0 font-semibold underline"
+              onClick={() => void profile.refetch()}
+            >
+              Réessayer
+            </button>
+          </div>
+        )}
         {/* {children ?? <Outlet } */}
 
         {children ?? (

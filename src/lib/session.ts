@@ -17,6 +17,7 @@ export interface SessionUser {
   email: string;
   id?: number;
   role?: "CLIENT" | "ADMIN";
+  emailVerified?: boolean;
 }
 export interface Session {
   token: string;
