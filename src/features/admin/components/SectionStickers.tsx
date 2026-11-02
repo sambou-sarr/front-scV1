@@ -24,7 +24,6 @@ import {
   ErrorBox,
   Loading,
   Modal,
-  Seg,
   useAction,
 } from "./ui";
 
@@ -109,17 +108,12 @@ function PreviewModal({
 }
 
 const FILTERS = [
-  ["todo", "À traiter"],
-  ["active", "Activées"],
-  ["all", "Toutes"],
+  ["all", "Tous les statuts"],
+  ...Object.entries(SS_STATUT).map(([status, value]) => [status, value.label] as const),
 ] as const;
-type Filter = (typeof FILTERS)[number][0];
-const matches = (f: Filter, d: SectionStickerAdmin) =>
-  f === "all"
-    ? true
-    : f === "todo"
-      ? d.statut === "demande"
-      : d.statut === "active";
+type Filter = "all" | SectionStickerAdmin["statut"];
+const matches = (filter: Filter, demande: SectionStickerAdmin) =>
+  filter === "all" || demande.statut === filter;
 
 /**
  * Onglet « Stickers par section » de la page Production : toutes les demandes des clients.
@@ -134,7 +128,7 @@ export function SectionStickersTab({
   error: string | null;
   onChanged: () => void;
 }) {
-  const [filter, setFilter] = useState<Filter>("todo");
+  const [filter, setFilter] = useState<Filter>("demande");
   const [preview, setPreview] = useState<SectionStickerAdmin | null>(null);
   const decide = useDecision(onChanged);
   if (error) return <ErrorBox message={error} onRetry={onChanged} />;
@@ -146,10 +140,21 @@ export function SectionStickersTab({
         Demandes de devis des clients. « Activer la section » ouvre la page /s/…
         au public et donne au client son lien et son QR.
       </p>
-      <Seg value={filter} onChange={setFilter} options={FILTERS} />
+      <label className="prod-status-filter">
+        Filtrer les demandes par statut
+        <select
+          aria-label="Filtrer les demandes par statut"
+          value={filter}
+          onChange={event => setFilter(event.target.value as Filter)}
+        >
+          {FILTERS.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </label>
       {list.length === 0 ? (
         <Empty>
-          {filter === "todo" ? "Aucune demande à traiter." : "Aucune demande."}
+          {filter === "demande" ? "Aucune demande à traiter." : "Aucune demande."}
         </Empty>
       ) : (
         <div className="table-wrap">

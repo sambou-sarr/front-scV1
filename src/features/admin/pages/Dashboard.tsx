@@ -156,6 +156,14 @@ export default function Dashboard() {
           onClick={go("/fiches?sticker=demande")}
         />
         <Kpi
+          icon="card"
+          label="Demandes de cartes"
+          value={new Intl.NumberFormat("fr-FR").format(s.demandesCarte)}
+          sub="en cours de production"
+          tone={s.demandesCarte ? "hot" : undefined}
+          onClick={go("/production")}
+        />
+        <Kpi
           icon="eye"
           label="Scans au total"
           value={new Intl.NumberFormat("fr-FR").format(s.scansTotal)}

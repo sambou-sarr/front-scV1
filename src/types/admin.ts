@@ -52,6 +52,7 @@ export interface Stats {
   scansTotal: number;
   clients: number;
   demandesSticker: number;
+  demandesCarte: number;
 }
 
 export interface Abonnement {
