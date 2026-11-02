@@ -183,14 +183,14 @@ export default function PaymentsPage() {
                         >
                           Reçu
                         </button>
-                        <button
+                        {/* <button
                           type="button"
                           disabled
                           title="Les coordonnées légales et de facturation sont nécessaires avant l’émission."
                           className="rounded-xl border border-[#d8d2c8] px-3.5 py-2.5 text-sm font-semibold text-[#25221e] opacity-40"
                         >
                           Facture
-                        </button>
+                        </button> */}
                       </div>
                     </article>
                   );
