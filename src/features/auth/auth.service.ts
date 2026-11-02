@@ -38,9 +38,32 @@ export async function login(loginData: Login): Promise<LoginResponse> {
     const { token, user } = res.data;
     saveSession({
       token,
-      user: { id: user.id, role: user.role, name: user.nom, email: user.email },
+      user: {
+        id: user.id,
+        role: user.role,
+        name: user.nom,
+        email: user.email,
+        emailVerified: user.emailVerified,
+      },
     });
     return res.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function getCurrentUser(): Promise<LoginResponse["user"]> {
+  try {
+    const res = await api.get<{ user: LoginResponse["user"] }>("/auth/me");
+    return res.data.user;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  try {
+    await api.post("/auth/resend-verification");
   } catch (error) {
     throw toApiError(error);
   }
