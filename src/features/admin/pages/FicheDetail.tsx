@@ -232,8 +232,9 @@ function FicheDetail({ id }: { id: number }) {
           <h2>Zone sensible</h2>
         </div>
         <p className="adm-muted">
-          La suppression est définitive : contenus, médias et abonnements
-          disparaissent avec la fiche.
+          La fiche et ses contenus seront supprimés définitivement. Les
+          abonnements et paiements restent conservés dans l’historique
+          financier, avec le nom et l’adresse de la fiche.
         </p>
         <Btn icon="trash" onClick={() => setDlg("delete")}>
           Supprimer la fiche

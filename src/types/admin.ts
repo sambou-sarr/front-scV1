@@ -64,6 +64,49 @@ export interface Abonnement {
   referencePaiement: string | null;
   annuleLe: string | null;
 }
+export interface BillingFiche {
+  id: number | null;
+  slug: string;
+  nom: string;
+  entreprise: string;
+  email: string | null;
+}
+export type AbonnementStatut = "pending" | "active" | "expired" | "canceled";
+export type PaiementStatut =
+  | "pending"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+export interface AdminAbonnement {
+  id: number;
+  formule: Formule;
+  statut: AbonnementStatut;
+  debut: string;
+  fin: string | null;
+  montantFcfa: number | null;
+  referencePaiement: string | null;
+  createdAt: string;
+  fiche: BillingFiche;
+  paiementId: number | null;
+}
+export interface AdminPaiement {
+  id: number;
+  formule: Formule;
+  statut: PaiementStatut;
+  fournisseur: string;
+  montantFcfa: number;
+  devise: string;
+  reference: string | null;
+  motifEchec: string | null;
+  createdAt: string;
+  payeLe: string | null;
+  fiche: BillingFiche;
+  abonnementId: number | null;
+}
+export interface BillingList<T> {
+  items: T[];
+  pagination: Pagination;
+}
 // Le détail d'une fiche vient de toFicheDto (module fiches) : on ne lit que quelques champs, sans supposer le reste.
 export type FicheDto = {
   id: number;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  PLANS,
   configuredTabs,
   defaultTabs,
   signatureHeader,
@@ -75,6 +76,7 @@ describe("Signature template fallback", () => {
 /* ───── robustesse du correctif : ancien modèle, migration, entête unique ───── */
 import {
   hasLegacyEssentialTemplate,
+  hasLegacyProTemplate,
   migrateLegacySignature,
   resolveHeader,
 } from "./plans";
@@ -171,6 +173,56 @@ describe("migrateLegacySignature", () => {
     const f = legacySignature();
     const once = { ...f, data: { ...f.data, ...migrateLegacySignature(f) } };
     expect(migrateLegacySignature(once)).toBeNull();
+  });
+});
+
+describe("reconnaître le modèle Pro après un upgrade Signature", () => {
+  const legacyProSignature = (): FicheRecord => {
+    const base = structuredClone(FICHES.find(f => f.formule === "pro")!);
+    return {
+      ...base,
+      formule: "signature",
+      planCapabilities: PLANS.signature,
+      data: {
+        ...base.data,
+        onglets: PLANS.pro.tabs.map((type, index) => ({
+          type,
+          visible: true,
+          id: `cuid-pro-tab-${index}`,
+        })),
+      },
+    };
+  };
+
+  it("remplace les blocs du modèle Pro par les blocs Signature", () => {
+    const fiche = legacyProSignature();
+
+    expect(hasLegacyProTemplate(fiche)).toBe(true);
+    expect(configuredTabs(fiche).map(tab => tab.type)).toEqual(
+      PLANS.signature.tabs,
+    );
+    expect(migrateLegacySignature(fiche)?.onglets).toMatchObject(
+      PLANS.signature.tabs.map(type => ({ type, visible: true })),
+    );
+  });
+
+  it("reconnaît les blocs Pro réordonnés avec les identifiants créés par l'API", () => {
+    const fiche = legacyProSignature();
+    fiche.data.onglets!.reverse();
+
+    expect(hasLegacyProTemplate(fiche)).toBe(true);
+    expect(configuredTabs(fiche).map(tab => tab.type)).toEqual(
+      PLANS.signature.tabs,
+    );
+  });
+
+  it("préserve une configuration Pro personnalisée après l'upgrade", () => {
+    const fiche = legacyProSignature();
+    fiche.data.onglets![0].visible = false;
+
+    expect(hasLegacyProTemplate(fiche)).toBe(false);
+    expect(configuredTabs(fiche)).toBe(fiche.data.onglets);
+    expect(migrateLegacySignature(fiche)).toBeNull();
   });
 });
 

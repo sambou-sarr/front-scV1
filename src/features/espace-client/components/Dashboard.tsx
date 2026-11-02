@@ -140,10 +140,7 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
     }
 
     deleteMutation.mutate(ficheToDelete.id);
-    draftMutation.mutate(ficheToDelete.id);
   };
-
-  // console.log(draftMutation.error?.message);
 
   const handleCreated = () => {
     setCreateOpen(false);
@@ -554,9 +551,10 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
                 </p>
 
                 <p>
-                  La suppression de la fiche peut affecter l’accès au service
-                  associé. Vérifiez les conséquences sur l’abonnement avant de
-                  continuer.
+                  La suppression définitive retire la fiche et ses contenus,
+                  mais conserve ses abonnements et paiements dans l’historique
+                  financier administrateur. Vous pouvez aussi la mettre en
+                  brouillon sans la supprimer.
                 </p>
               </div>
             ) : (

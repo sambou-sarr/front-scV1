@@ -298,13 +298,58 @@ export const hasLegacyEssentialTemplate = (
   isEssentialDefaultTabs(fiche.data.onglets) &&
   !fiche.data.onglets.some(tab => tab.id.startsWith("signature-"));
 
-/** Onglets persistés, en remplaçant les seuls défauts Essentielle après un upgrade Signature. */
+const templateTypes = (plan: Plan, key: Secteur) => {
+  let types = TEMPLATES[key].tabs.filter(type => plan.tabs.includes(type));
+  if (!plan.canReorder)
+    types = plan.tabs.filter(type => types.includes(type) || plan.tabs.length <= 3);
+  if (!plan.canAdd)
+    plan.tabs.forEach(type => {
+      if (!types.includes(type) && type !== "texte") types.push(type);
+    });
+  return types;
+};
+
+const isDefaultTab = (tab: Onglet, type: TabType) =>
+  tab.type === type &&
+  tab.visible !== false &&
+  tab.titre === undefined &&
+  tab.contenu === undefined;
+
+/** Une fiche Signature peut encore contenir les blocs par défaut de Pro après un upgrade. */
+export const hasLegacyProTemplate = (
+  fiche: Pick<FicheRecord, "formule" | "data">
+) => {
+  const tabs = fiche.data.onglets;
+  if (fiche.formule !== "signature" || !tabs?.length) return false;
+
+  const proTypes = new Set(PLANS.pro.tabs);
+  return (
+    tabs.length === proTypes.size &&
+    new Set(tabs.map(tab => tab.type)).size === proTypes.size &&
+    tabs.every(tab => proTypes.has(tab.type) && isDefaultTab(tab, tab.type))
+  );
+};
+
+const upgradedSignatureTabs = (
+  fiche: Pick<FicheRecord, "data" | "planCapabilities">
+): Onglet[] => {
+  const plan = fiche.planCapabilities ?? PLANS.signature;
+  return plan.tabs.map(type => ({
+    id: `signature-${type}`,
+    type,
+    visible: true,
+  }));
+};
+
+/** Onglets persistés, en remplaçant les modèles par défaut hérités après un upgrade Signature. */
 export const configuredTabs = (
   fiche: Pick<FicheRecord, "formule" | "data">
 ): Onglet[] => {
   const tabs = fiche.data.onglets;
   if (!tabs?.length) return defaultTabs(fiche.formule);
-  if (hasLegacyEssentialTemplate(fiche)) return defaultTabs("signature");
+  if (hasLegacyProTemplate(fiche)) return upgradedSignatureTabs(fiche);
+  if (hasLegacyEssentialTemplate(fiche))
+    return defaultTabs("signature");
   return tabs;
 };
 
@@ -353,9 +398,13 @@ export function resolveHeader(
 export function migrateLegacySignature(
   fiche: FicheRecord
 ): Pick<FicheData, "onglets" | "entete"> | null {
-  if (!hasLegacyEssentialTemplate(fiche)) return null;
+  if (!hasLegacyEssentialTemplate(fiche) && !hasLegacyProTemplate(fiche))
+    return null;
   const entete = signatureHeader(fiche);
-  return { onglets: defaultTabs("signature"), ...(entete ? { entete } : {}) };
+  const onglets = hasLegacyProTemplate(fiche)
+    ? upgradedSignatureTabs(fiche)
+    : defaultTabs("signature");
+  return { onglets, ...(entete ? { entete } : {}) };
 }
 
 // Applique un modèle de métier sans jamais dépasser la formule
@@ -365,13 +414,7 @@ export function applyTemplate(
   plan: Plan = PLANS[formule]
 ): { onglets: Onglet[]; entete: Entete } {
   const t = TEMPLATES[key];
-  let types = t.tabs.filter(x => plan.tabs.includes(x));
-  if (!plan.canReorder)
-    types = plan.tabs.filter(x => types.includes(x) || plan.tabs.length <= 3);
-  if (!plan.canAdd)
-    plan.tabs.forEach(x => {
-      if (!types.includes(x) && x !== "texte") types.push(x);
-    });
+  const types = templateTypes(plan, key);
   return {
     onglets: types.map(type => ({
       id: nid(type),

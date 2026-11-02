@@ -66,6 +66,45 @@ describe("adminApi", () => {
     });
   });
 
+  it("charge les abonnements et paiements avec leurs filtres ciblés", async () => {
+    await adminApi.listSubscriptions({
+      formule: "signature",
+      statut: "active",
+      ficheSupprimee: "non",
+      subscriptionId: 31,
+      page: 2,
+    });
+    await adminApi.listPayments({
+      paymentId: 71,
+      ficheSupprimee: "oui",
+      from: "2026-10-01",
+      to: "",
+      page: 1,
+    });
+
+    expect(calls.map(({ url, params }) => [url, params])).toEqual([
+      [
+        "/admin/subscriptions",
+        {
+          formule: "signature",
+          statut: "active",
+          ficheSupprimee: "non",
+          subscriptionId: 31,
+          page: 2,
+        },
+      ],
+      [
+        "/admin/payments",
+        {
+          paymentId: 71,
+          ficheSupprimee: "oui",
+          from: "2026-10-01",
+          page: 1,
+        },
+      ],
+    ]);
+  });
+
   it("utilise les routes Formules pour les réglages administrateur", async () => {
     await adminApi.getFormules();
     await adminApi.updateFormule("pro", { actif: true });

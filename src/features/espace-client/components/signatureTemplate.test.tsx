@@ -5,7 +5,13 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
-import { hasLegacyEssentialTemplate, resolveHeader } from "../../../lib/plans";
+import {
+  PLANS,
+  TAB_TYPES,
+  hasLegacyEssentialTemplate,
+  hasLegacyProTemplate,
+  resolveHeader,
+} from "../../../lib/plans";
 import { FICHES } from "../../../test/fixtures/fiches";
 import type { FicheRecord } from "../../../types";
 import Editor from "./Editor";
@@ -54,10 +60,35 @@ describe("fiche Signature à l'ancien modèle", () => {
     const out = html(h(Fiche, { fiche: legacy() }));
     expect(out).toContain("Galerie");
   });
+
+  it("affiche le modèle Signature après un upgrade depuis le modèle Pro", () => {
+    const base = structuredClone(FICHES.find(f => f.formule === "pro")!);
+    const fiche: FicheRecord = {
+      ...base,
+      formule: "signature",
+      planCapabilities: PLANS.signature,
+      data: {
+        ...base.data,
+        onglets: PLANS.pro.tabs.map((type, index) => ({
+          type,
+          visible: true,
+          id: `cuid-pro-tab-${index}`,
+        })),
+      },
+    };
+
+    const out = html(h(Fiche, { fiche }));
+    const signatureTypes = PLANS.signature.tabs;
+    for (const tab of signatureTypes)
+      expect(out).toContain(TAB_TYPES[tab].label.replace("&", "&amp;"));
+  });
 });
 
 describe("Editor : première modification d'une fiche à l'ancien modèle", () => {
-  const edit = (act_: (host: HTMLElement) => void) => {
+  const edit = (
+    fiche: FicheRecord,
+    act_: (host: HTMLElement) => void,
+  ) => {
     const host = document.createElement("div");
     const root = createRoot(host);
     const received: FicheRecord[] = [];
@@ -67,7 +98,7 @@ describe("Editor : première modification d'une fiche à l'ancien modèle", () =
           h(
             MemoryRouter,
             null,
-            h(Editor, { fiche: legacy(), onChange: f => received.push(f) }),
+            h(Editor, { fiche, onChange: f => received.push(f) }),
           ),
         ),
       ),
@@ -78,7 +109,7 @@ describe("Editor : première modification d'une fiche à l'ancien modèle", () =
   };
 
   it("choisir le thème « bleu » est respecté et enregistre les onglets Signature", () => {
-    const [next] = edit(host =>
+    const [next] = edit(legacy(), host =>
       (host.querySelector(".ed-themes .tt-bleu") as HTMLButtonElement).click(),
     );
     expect(next.data.entete?.theme).toBe("bleu");
@@ -90,10 +121,37 @@ describe("Editor : première modification d'une fiche à l'ancien modèle", () =
   });
 
   it("choisir un autre thème enregistre aussi les onglets Signature", () => {
-    const [next] = edit(host =>
+    const [next] = edit(legacy(), host =>
       (host.querySelector(".ed-themes .tt-nuit") as HTMLButtonElement).click(),
     );
     expect(resolveHeader(next).theme).toBe("nuit");
     expect(next.data.onglets!.length).toBeGreaterThan(3);
+  });
+
+  it("persiste le modèle Signature au premier changement après l'upgrade depuis Pro", () => {
+    const base = structuredClone(FICHES.find(f => f.formule === "pro")!);
+    const fiche: FicheRecord = {
+      ...base,
+      formule: "signature",
+      planCapabilities: PLANS.signature,
+      data: {
+        ...base.data,
+        onglets: PLANS.pro.tabs.map((type, index) => ({
+          type,
+          visible: true,
+          id: `cuid-pro-tab-${index}`,
+        })),
+      },
+    };
+
+    const [next] = edit(fiche, host =>
+      (host.querySelector(".ed-themes .tt-nuit") as HTMLButtonElement).click(),
+    );
+
+    expect(hasLegacyProTemplate(next)).toBe(false);
+    expect(next.data.onglets?.map(tab => tab.type)).toEqual(
+      PLANS.signature.tabs,
+    );
+    expect(next.data.entete?.theme).toBe("nuit");
   });
 });

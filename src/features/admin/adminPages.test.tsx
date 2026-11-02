@@ -9,6 +9,7 @@ import { clearSession, saveSession } from "../../lib/session";
 import RequireAdmin from "../auth/RequireAdmin";
 import AdminLayout from "./layout/AdminLayout";
 import AdminNotFound from "./pages/AdminNotFound";
+import Billing from "./pages/Billing";
 import Clients from "./pages/Clients";
 import Dashboard from "./pages/Dashboard";
 import FicheDetail from "./pages/FicheDetail";
@@ -45,6 +46,20 @@ const relance = (id: number, slug: string) => ({
   formule: "pro", dateEcheance: "2027-01-15", joursRestants: 80, scansTotal: id,
   telephone: null, whatsapp: null, email: null, proprietaire: null,
 });
+const billingFiche = {
+  id: 12,
+  slug: "chez-awa",
+  nom: "Awa Ndiaye",
+  entreprise: "Chez Awa",
+  email: "awa@sc.sn",
+};
+const deletedBillingFiche = {
+  id: null,
+  slug: "chez-awa",
+  nom: "Awa Ndiaye",
+  entreprise: "",
+  email: null,
+};
 
 let calls: { url?: string; params?: Record<string, unknown> }[] = [];
 const original = api.defaults.adapter;
@@ -69,6 +84,33 @@ const route = (c: InternalAxiosRequestConfig): unknown => {
   if (url === "/admin/fiches/13")
     return { fiche: { id: 13, slug: "fiche-libre", nom: "Fiche libre", statut: "active" },
       abonnements: [] };
+  if (url === "/admin/subscriptions") {
+    const params = c.params as Record<string, string> | undefined;
+    const currentItem = {
+      id: 31, formule: "signature", statut: "active",
+      debut: "2026-10-01T00:00:00.000Z", fin: "2027-10-01T00:00:00.000Z",
+      montantFcfa: 75000, referencePaiement: "PAY-71",
+      createdAt: "2026-10-01T00:00:00.000Z", fiche: billingFiche, paiementId: 71,
+    };
+    const deletedItem = { ...currentItem, fiche: deletedBillingFiche };
+    const items = (params?.ficheSupprimee === "oui" ? [deletedItem] : [currentItem])
+      .filter(item => !params?.subscriptionId || String(item.id) === String(params.subscriptionId));
+    return { items, pagination: { ...page, total: items.length } };
+  }
+  if (url === "/admin/payments") {
+    const params = c.params as Record<string, string> | undefined;
+    const currentItem = {
+      id: 71, formule: "signature", statut: "succeeded", fournisseur: "wave",
+      montantFcfa: 75000, devise: "XOF", reference: "PAY-71", motifEchec: null,
+      createdAt: "2026-10-01T00:00:00.000Z", payeLe: "2026-10-01T00:00:00.000Z",
+      fiche: billingFiche, abonnementId: 31,
+    };
+    const deletedItem = { ...currentItem, fiche: deletedBillingFiche };
+    const items = (params?.ficheSupprimee === "oui" ? [deletedItem] : [currentItem])
+      .filter(item => !params?.paymentId || String(item.id) === String(params.paymentId))
+      .filter(item => !params?.statut || item.statut === params.statut);
+    return { items, pagination: { ...page, total: items.length } };
+  }
   if (url === "/admin/users")
     return { users: [{ id: 9, email: "awa@sc.sn", nom: "Awa", role: "client", emailVerifie: true, createdAt: "2026-01-01T00:00:00Z", nbFiches: 2 }], pagination: page };
   if (url === "/admin/leads") return {
@@ -145,6 +187,7 @@ const app = (path: string) => (
         <Route index element={<Dashboard />} />
         <Route path="fiches" element={<Fiches />} />
         <Route path="fiches/:id" element={<FicheDetail />} />
+        <Route path="abonnements" element={<Billing />} />
         <Route path="clients" element={<Clients />} />
         <Route path="demandes" element={<Leads />} />
         <Route path="production" element={<Production />} />
@@ -170,7 +213,7 @@ describe("pages du back-office", () => {
     expect(host.textContent).toContain("Root");
     expect(host.textContent).toContain("Encaissé ce mois");
     expect(host.textContent).toMatch(/50\s000\sF/); // espace (insécable) du format fr-FR
-    for (const l of ["Fiches", "Clients", "Demandes", "Relances", "Production", "QR codes", "Formules"])
+    for (const l of ["Fiches", "Abonnements & paiements", "Clients", "Demandes", "Relances", "Production", "QR codes", "Formules"])
       expect(byText("aside nav a", l), l).toBeTruthy();
     expect(byText("aside nav a", "Formules")?.getAttribute("href")).toBe("/admin/formules");
   });
@@ -257,6 +300,57 @@ describe("pages du back-office", () => {
     expect(where()).toBe("/admin/fiches?userId=9");
     expect(calls.filter(c => c.url === "/admin/fiches").at(-1)?.params).toMatchObject({ userId: "9" });
     expect(host.textContent).toContain("Fiches d’un client");
+  });
+
+  it("ouvre le paiement associé à un abonnement et filtre la liste", async () => {
+    act(() => root.render(app("/admin/abonnements")));
+    await settle();
+    expect(host.textContent).toContain("Abonnements & paiements");
+    expect(host.textContent).toContain("Voir paiement");
+
+    click(byText("button.adm-btn", "Voir paiement"));
+    await settle();
+
+    expect(where()).toBe("/admin/abonnements?view=payments&paymentId=71");
+    expect(host.textContent).toContain("PAY-71");
+    expect(calls.filter(call => call.url === "/admin/payments").at(-1)?.params)
+      .toMatchObject({ paymentId: 71 });
+
+    const status = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Filtrer par statut"]',
+    )!;
+    act(() => {
+      status.value = "succeeded";
+      status.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+    expect(calls.filter(call => call.url === "/admin/payments").at(-1)?.params)
+      .toMatchObject({ statut: "succeeded", paymentId: 71 });
+
+    click(byText("button.link", "Abonnement #31"));
+    await settle();
+    expect(where()).toBe("/admin/abonnements?subscriptionId=31");
+    expect(calls.filter(call => call.url === "/admin/subscriptions").at(-1)?.params)
+      .toMatchObject({ subscriptionId: 31 });
+  });
+
+  it("filtre les paiements des fiches supprimées et les identifie", async () => {
+    act(() => root.render(app("/admin/abonnements?view=payments")));
+    await settle();
+
+    const ficheFilter = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Filtrer par état de la fiche"]',
+    )!;
+    act(() => {
+      ficheFilter.value = "oui";
+      ficheFilter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+
+    expect(calls.filter(call => call.url === "/admin/payments").at(-1)?.params)
+      .toMatchObject({ ficheSupprimee: "oui" });
+    expect(host.textContent).toContain("Fiche supprimée");
+    expect(host.textContent).toContain("Awa Ndiaye");
   });
 
   it("l’administration affiche les demandes de contact et leurs coordonnées", async () => {

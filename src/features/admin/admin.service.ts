@@ -4,6 +4,9 @@ import { api } from "../../lib/api";
 import { toApiError } from "../../lib/apiError";
 import type {
   Abonnement,
+  AdminAbonnement,
+  AdminPaiement,
+  BillingList,
   Carte,
   CommandeInput,
   CreateModeleCarteInput,
@@ -142,6 +145,28 @@ export const adminApi = {
     del<{ ok: true }>(`/admin/fiches/${id}`, { confirmer: slug }),
 
   // ───── Abonnements ─────
+  listSubscriptions: (p: {
+    search?: string;
+    formule?: string;
+    statut?: string;
+    ficheSupprimee?: "oui" | "non";
+    from?: string;
+    to?: string;
+    subscriptionId?: number;
+    page?: number;
+    limit?: number;
+  }) => get<BillingList<AdminAbonnement>>("/admin/subscriptions", p),
+  listPayments: (p: {
+    search?: string;
+    formule?: string;
+    statut?: string;
+    ficheSupprimee?: "oui" | "non";
+    from?: string;
+    to?: string;
+    paymentId?: number;
+    page?: number;
+    limit?: number;
+  }) => get<BillingList<AdminPaiement>>("/admin/payments", p),
   activateSubscription: (id: number, b: SubscriptionInput) =>
     post<{ subscription: Abonnement }>(`/admin/fiches/${id}/subscription`, b),
   cancelSubscription: (id: number, subId: number) =>

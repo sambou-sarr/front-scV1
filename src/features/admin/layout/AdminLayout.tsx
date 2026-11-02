@@ -17,6 +17,7 @@ export const ADMIN_BASE = "/admin";
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: ADMIN_BASE, label: "Tableau de bord", icon: "dash" },
   { to: `${ADMIN_BASE}/fiches`, label: "Fiches", icon: "card" },
+  { to: `${ADMIN_BASE}/abonnements`, label: "Abonnements & paiements", icon: "cal" },
   { to: `${ADMIN_BASE}/clients`, label: "Clients", icon: "users" },
   { to: `${ADMIN_BASE}/demandes`, label: "Demandes", icon: "file" },
   { to: `${ADMIN_BASE}/relances`, label: "Relances", icon: "zap" },

@@ -94,6 +94,7 @@ const AdminFicheDetail = lazy(
   () => import("./features/admin/pages/FicheDetail")
 );
 const AdminClients = lazy(() => import("./features/admin/pages/Clients"));
+const AdminBilling = lazy(() => import("./features/admin/pages/Billing"));
 const AdminLeads = lazy(() => import("./features/admin/pages/Leads"));
 const AdminRelances = lazy(() => import("./features/admin/pages/Relances"));
 const AdminProduction = lazy(() => import("./features/admin/pages/Production"));
@@ -239,6 +240,7 @@ export default function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="fiches" element={<AdminFiches />} />
             <Route path="fiches/:id" element={<AdminFicheDetail />} />
+            <Route path="abonnements" element={<AdminBilling />} />
             <Route path="clients" element={<AdminClients />} />
             <Route path="demandes" element={<AdminLeads />} />
             <Route path="relances" element={<AdminRelances />} />
