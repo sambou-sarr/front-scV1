@@ -264,6 +264,8 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
   const pc = cur ? completion(cur) : 0;
 
   const scans = fiches.reduce((sum, fiche) => sum + fiche.scansTotal, 0);
+  const expiredCount = fiches.filter(fiche => health(fiche) === "expired").length;
+  const expiringCount = fiches.filter(fiche => health(fiche) === "soon").length;
 
   const alerts = fiches.filter(
     fiche => !["ok", "draft"].includes(health(fiche))
@@ -330,6 +332,24 @@ export default function Dashboard({ user, onEdit, onView }: Props) {
           <b className="sm">{fmtDate(last)}</b>
           <small>sur l’ensemble de vos fiches</small>
         </div>
+        <Link
+          className="db-kpi db-kpi-link"
+          to="/espace-client/abonnements?expiry=expired"
+          aria-label={`Fiches expirées : ${expiredCount}. Voir les abonnements`}
+        >
+          <span>Fiches expirées</span>
+          <b>{expiredCount}</b>
+          <small>Voir les abonnements</small>
+        </Link>
+        <Link
+          className="db-kpi db-kpi-link"
+          to="/espace-client/abonnements?expiry=expiring"
+          aria-label={`Fiches à renouveler bientôt : ${expiringCount}. Voir les abonnements`}
+        >
+          <span>À renouveler bientôt</span>
+          <b>{expiringCount}</b>
+          <small>Selon la durée de l’abonnement</small>
+        </Link>
       </section>
 
       <div className="db-grid">

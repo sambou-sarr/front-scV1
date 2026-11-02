@@ -128,6 +128,83 @@ describe("filterFiches", () => {
       }).map(item => item.id),
     ).toEqual([4]);
   });
+
+  it("applique le préavis d'échéance en fonction de la durée réelle", () => {
+    const oneMonthSubscription = fiche({
+      subscriptions: [
+        {
+          startsAt: "2025-12-20T00:00:00.000Z",
+          endsAt: "2026-01-20T00:00:00.000Z",
+          status: "ACTIVE",
+          plan: { type: "PRO" },
+        },
+      ],
+    });
+    const threeMonthSubscription = fiche({
+      id: 7,
+      subscriptions: [
+        {
+          startsAt: "2025-10-22T00:00:00.000Z",
+          endsAt: "2026-01-20T00:00:00.000Z",
+          status: "ACTIVE",
+          plan: { type: "PRO" },
+        },
+      ],
+    });
+    const annualSubscription = fiche({
+      id: 8,
+      subscriptions: [
+        {
+          startsAt: "2025-01-20T00:00:00.000Z",
+          endsAt: "2026-01-20T00:00:00.000Z",
+          status: "ACTIVE",
+          plan: { type: "SIGNATURE" },
+        },
+      ],
+    });
+    const expiringFilters = {
+      ...DEFAULT_FICHE_LIST_FILTERS,
+      expiry: "expiring" as const,
+    };
+
+    expect(filterFiches([threeMonthSubscription], expiringFilters, now))
+      .toHaveLength(0);
+    expect(
+      filterFiches(
+        [threeMonthSubscription],
+        expiringFilters,
+        Date.parse("2026-01-13T00:00:00.000Z"),
+      ),
+    ).toEqual([threeMonthSubscription]);
+    expect(
+      filterFiches(
+        [annualSubscription],
+        expiringFilters,
+        Date.parse("2026-01-04T00:00:00.000Z"),
+      ),
+    ).toHaveLength(0);
+    expect(
+      filterFiches(
+        [annualSubscription],
+        expiringFilters,
+        Date.parse("2026-01-05T00:00:00.000Z"),
+      ),
+    ).toEqual([annualSubscription]);
+    expect(
+      filterFiches(
+        [oneMonthSubscription, threeMonthSubscription, annualSubscription],
+        { ...expiringFilters, expiry: "expiring-7" },
+        Date.parse("2026-01-13T00:00:00.000Z"),
+      ),
+    ).toEqual([oneMonthSubscription, threeMonthSubscription]);
+    expect(
+      filterFiches(
+        [oneMonthSubscription, threeMonthSubscription, annualSubscription],
+        { ...expiringFilters, expiry: "expiring-15" },
+        Date.parse("2026-01-05T00:00:00.000Z"),
+      ),
+    ).toEqual([annualSubscription]);
+  });
 });
 
 describe("pageFiches", () => {

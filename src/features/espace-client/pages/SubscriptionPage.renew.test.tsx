@@ -39,6 +39,20 @@ const active = {
     { endsAt: day(200), status: "ACTIVE", plan: { type: "SIGNATURE" } },
   ],
 };
+const expiring = {
+  ...base,
+  prenom: "Awa",
+  id: 14,
+  slug: "awa-pro",
+  subscriptions: [
+    {
+      startsAt: day(-85),
+      endsAt: day(6),
+      status: "ACTIVE",
+      plan: { type: "PRO" },
+    },
+  ],
+};
 
 const Where = () => {
   const l = useLocation();
@@ -87,7 +101,7 @@ describe("SubscriptionPage : lien de renouvellement", () => {
           data: { nbrFiche: 2, nbrFicheActive: 2, nbrPayingFiche: 1 },
         });
       if (config.url === "client/dashboard/fiches")
-        return mk([expired, active] as ApiFicheSummary[]);
+        return mk([expired, active, expiring] as ApiFicheSummary[]);
       if (config.url === "client/parametres")
         return mk({
           formules: [
@@ -188,5 +202,25 @@ describe("SubscriptionPage : lien de renouvellement", () => {
     expect(host.textContent).not.toContain("Renouveler l’abonnement"); // pas de fenêtre ouverte
     expect(buttons("Renouveler").length).toBeGreaterThan(0);
     expect(host.textContent).toContain("Voir formule"); // la fiche valide garde son bouton d'origine
+  });
+
+  it("?expiry=expiring : sélectionne le filtre dynamique d'échéance", async () => {
+    await open("/espace-client/abonnements?expiry=expiring");
+
+    expect(
+      host.querySelector<HTMLSelectElement>("#fiche-filter-expiry")?.value,
+    ).toBe("expiring");
+    expect(host.textContent).toContain("Awa");
+    expect(host.textContent).not.toContain("Rose");
+  });
+
+  it("?expiry=expiring-7 : sélectionne le filtre explicite des 7 jours", async () => {
+    await open("/espace-client/abonnements?expiry=expiring-7");
+
+    expect(
+      host.querySelector<HTMLSelectElement>("#fiche-filter-expiry")?.value,
+    ).toBe("expiring-7");
+    expect(host.textContent).toContain("Expire dans les 7 jours");
+    expect(host.textContent).not.toContain("Rose");
   });
 });

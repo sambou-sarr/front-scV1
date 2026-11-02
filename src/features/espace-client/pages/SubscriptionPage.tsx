@@ -33,6 +33,20 @@ export type SubscriptionKpi = {
   };
 };
 
+const getExpiryFilter = (
+  value: string | null
+): FicheListFilters["expiry"] => {
+  if (
+    value === "expiring" ||
+    value === "expiring-7" ||
+    value === "expiring-15" ||
+    value === "expired" ||
+    value === "no-expiry"
+  )
+    return value;
+  return "all";
+};
+
 function getSubscriptionExpiry(fiche: ApiFicheSummary) {
   const subscription =
     fiche.subscriptions?.[0] ??
@@ -113,7 +127,10 @@ export default function SubscriptionPage() {
   };
   const [cardFiche, setCardFiche] = useState<ApiFicheSummary | null>(null);
   const [showPlans, setShowPlans] = useState(false);
-  const [filters, setFilters] = useState(DEFAULT_FICHE_LIST_FILTERS);
+  const [filters, setFilters] = useState<FicheListFilters>(() => ({
+    ...DEFAULT_FICHE_LIST_FILTERS,
+    expiry: getExpiryFilter(searchParams.get("expiry")),
+  }));
   const [page, setPage] = useState(1);
   useEffect(() => {
     if (!cardFiche) return;

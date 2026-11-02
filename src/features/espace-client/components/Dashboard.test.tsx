@@ -46,6 +46,7 @@ const fiche: ApiFicheSummary = {
 };
 
 let calls: { method?: string; url?: string }[] = [];
+let dashboardFiches: ApiFicheSummary[] = [];
 let root: Root;
 let host: HTMLDivElement;
 let client: QueryClient;
@@ -53,13 +54,14 @@ const originalAdapter = api.defaults.adapter;
 
 beforeEach(() => {
   calls = [];
+  dashboardFiches = [fiche];
   client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   api.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
     calls.push({ method: config.method, url: config.url });
     const data =
-      config.method === "get" ? [fiche] : { ok: true };
+      config.method === "get" ? dashboardFiches : { ok: true };
     return {
       status: 200,
       data,
@@ -116,5 +118,59 @@ describe("Dashboard deletion", () => {
       { method: "delete", url: "/fiches/12" },
     ]);
     expect(calls.some(call => call.url?.includes("draft-fiche"))).toBe(false);
+  });
+
+  it("shows expiry KPI counts and links to matching subscription filters", async () => {
+    const endsAt = new Date(Date.now() + 6 * 86_400_000).toISOString();
+    const startsAt = new Date(Date.now() - 85 * 86_400_000).toISOString();
+    const expiredAt = new Date(Date.now() - 5 * 86_400_000).toISOString();
+    dashboardFiches = [
+      {
+        ...fiche,
+        id: 13,
+        subscriptions: [
+          {
+            startsAt,
+            endsAt,
+            status: "ACTIVE",
+            plan: { type: "PRO" },
+          },
+        ],
+      },
+      {
+        ...fiche,
+        id: 14,
+        latestSubscription: {
+          startsAt,
+          endsAt: expiredAt,
+          status: "EXPIRED",
+          plan: { type: "SIGNATURE" },
+        },
+      },
+    ];
+    act(() =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter>
+            <Dashboard
+              user={{ name: "Awa Ndiaye" }}
+              onEdit={() => {}}
+              onView={() => {}}
+            />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+    );
+    await settle();
+
+    const kpis = [
+      ...host.querySelectorAll<HTMLAnchorElement>(".db-kpi-link"),
+    ];
+    expect(kpis.map(link => link.getAttribute("href"))).toEqual([
+      "/espace-client/abonnements?expiry=expired",
+      "/espace-client/abonnements?expiry=expiring",
+    ]);
+    expect(kpis[0].querySelector("b")?.textContent).toBe("1");
+    expect(kpis[1].querySelector("b")?.textContent).toBe("1");
   });
 });

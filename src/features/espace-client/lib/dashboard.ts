@@ -33,7 +33,7 @@ export const subscriptionEndsAt = (f: ApiFicheSummary) =>
   f.latestSubscription?.endsAt ??
   f.abonnementActif?.endsAt;
 
-const subscriptionWarningDays = (f: ApiFicheSummary) => {
+export const subscriptionWarningDays = (f: ApiFicheSummary) => {
   const subscription =
     f.subscriptions?.[0] ?? f.latestSubscription ?? f.abonnementActif;
   const startsAt = subscription?.startsAt;

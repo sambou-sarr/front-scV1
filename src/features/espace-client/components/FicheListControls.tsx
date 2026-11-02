@@ -95,7 +95,9 @@ export function FicheListControls({ filters, onChange }: FiltersProps) {
         }
       >
         <option value="all">Toutes les échéances</option>
-        <option value="expiring">Expire dans les 30 jours</option>
+        <option value="expiring">À renouveler (dans 7 ou 15 jours)</option>
+        <option value="expiring-7">Expire dans les 7 jours</option>
+        <option value="expiring-15">Expire dans les 15 jours</option>
         <option value="expired">Échéance dépassée</option>
         <option value="no-expiry">Sans échéance</option>
       </select>

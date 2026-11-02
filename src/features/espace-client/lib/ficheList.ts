@@ -1,11 +1,18 @@
 import type { ApiFicheSummary, ApiSecteur, PlanType } from "../../../types";
+import { health, subscriptionWarningDays } from "./dashboard";
 
 export type FicheListFilters = {
   search: string;
   plan: "all" | PlanType;
   status: "all" | "active" | "expired" | "suspended" | "draft";
   sector: "all" | ApiSecteur;
-  expiry: "all" | "expiring" | "expired" | "no-expiry";
+  expiry:
+    | "all"
+    | "expiring"
+    | "expiring-7"
+    | "expiring-15"
+    | "expired"
+    | "no-expiry";
 };
 
 export const DEFAULT_FICHE_LIST_FILTERS: FicheListFilters = {
@@ -70,13 +77,23 @@ export function filterFiches(
     const endsAt = subscription?.endsAt;
     if (filters.expiry === "no-expiry" && endsAt) return false;
     if (filters.expiry === "expired" && status !== "expired") return false;
-    if (filters.expiry === "expiring") {
-      if (!endsAt || status !== "active") return false;
-      const daysRemaining = Math.ceil(
-        (new Date(endsAt).getTime() - now) / 86_400_000,
-      );
-      if (daysRemaining < 0 || daysRemaining > 30) return false;
-    }
+    if (
+      (filters.expiry === "expiring" ||
+        filters.expiry === "expiring-7" ||
+        filters.expiry === "expiring-15") &&
+      health(fiche, now) !== "soon"
+    )
+      return false;
+    if (
+      filters.expiry === "expiring-7" &&
+      subscriptionWarningDays(fiche) !== 7
+    )
+      return false;
+    if (
+      filters.expiry === "expiring-15" &&
+      subscriptionWarningDays(fiche) !== 15
+    )
+      return false;
 
     return true;
   });

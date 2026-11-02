@@ -25,7 +25,10 @@ beforeEach(() => {
   localStorage.clear();
   calls = [];
   respond = () => ({ status: 200, data: {} });
-  saveSession({ token: "T", user: { name: "Admin", email: "a@b.sn", role: "ADMIN" } });
+  saveSession({
+    token: "T",
+    user: { name: "Admin", email: "a@b.sn", role: "ADMIN" },
+  });
   api.defaults.adapter = async config => {
     calls.push({
       method: config.method,
@@ -35,7 +38,13 @@ beforeEach(() => {
       data: config.data,
     });
     const { status, data, headers } = respond(config);
-    const response = { status, data, statusText: "", headers: headers ?? {}, config };
+    const response = {
+      status,
+      data,
+      statusText: "",
+      headers: headers ?? {},
+      config,
+    };
     if (status >= 400)
       throw new AxiosError("fail", String(status), config, undefined, response);
     return response;
@@ -48,7 +57,13 @@ afterEach(() => {
 
 describe("adminApi", () => {
   it("envoie le jeton et retire les paramètres vides", async () => {
-    await adminApi.listFiches({ search: "", statut: "active", formule: undefined, page: 2, limit: 20 });
+    await adminApi.listFiches({
+      search: "",
+      statut: "active",
+      formule: undefined,
+      page: 2,
+      limit: 20,
+    });
     expect(calls[0]).toMatchObject({
       method: "get",
       url: "/admin/fiches",
@@ -122,15 +137,26 @@ describe("adminApi", () => {
   it("transmet les changements de slug d'une fiche sans compte client", async () => {
     await adminApi.updateFiche(5, { slug: "nouvelle-adresse" });
     expect(calls[0]).toMatchObject({ method: "patch", url: "/admin/fiches/5" });
-    expect(JSON.parse(String(calls[0].data))).toEqual({ slug: "nouvelle-adresse" });
+    expect(JSON.parse(String(calls[0].data))).toEqual({
+      slug: "nouvelle-adresse",
+    });
   });
 
   it("remonte les erreurs en ApiError lisible (format serveur, texte simple, repli par statut)", async () => {
-    respond = () => ({ status: 409, data: { error: { code: "SLUG", message: "Ce slug existe." } } });
-    await expect(adminApi.stats()).rejects.toMatchObject({ message: "Ce slug existe.", code: "SLUG", status: 409 });
+    respond = () => ({
+      status: 409,
+      data: { error: { code: "SLUG", message: "Ce slug existe." } },
+    });
+    await expect(adminApi.stats()).rejects.toMatchObject({
+      message: "Ce slug existe.",
+      code: "SLUG",
+      status: 409,
+    });
 
     respond = () => ({ status: 422, data: { error: "Carte déjà livrée." } });
-    await expect(adminApi.stats()).rejects.toMatchObject({ message: "Carte déjà livrée." });
+    await expect(adminApi.stats()).rejects.toMatchObject({
+      message: "Carte déjà livrée.",
+    });
 
     respond = () => ({ status: 403, data: {} });
     const e = await adminApi.stats().catch((x: unknown) => x);
@@ -138,7 +164,9 @@ describe("adminApi", () => {
     expect((e as ApiError).message).toBe("Accès refusé.");
 
     respond = () => ({ status: 503, data: {} });
-    await expect(adminApi.stats()).rejects.toMatchObject({ message: "Erreur du serveur." });
+    await expect(adminApi.stats()).rejects.toMatchObject({
+      message: "Erreur du serveur.",
+    });
   });
 
   it("un 401 met fin à la session (le garde renvoie vers la connexion)", async () => {
